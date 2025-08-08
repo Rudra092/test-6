@@ -8,48 +8,81 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin:0; font-family: Arial, Helvetica, sans-serif; }
-    #map { height: 80vh; width: 100%; }
+    #map { height: 75vh; width: 100%; }
     header { background:#222; color:white; padding:10px 16px; display:flex; align-items:center; gap:12px; }
-    .controls { padding:12px; display:flex; gap:8px; align-items:center; }
-    button { padding:6px 10px; border-radius:6px; border: none; background:#1976d2; color:white; cursor:pointer; }
-    input { padding:6px 8px; border-radius:6px; border:1px solid #ccc; }
+    .controls { padding:12px; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    button { padding:8px 12px; border-radius:6px; border: none; background:#1976d2; color:white; cursor:pointer; font-size:14px; }
+    button:hover { background:#1565c0; }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    input { padding:8px 10px; border-radius:6px; border:1px solid #ccc; min-width:200px; font-size:14px; }
+    input:focus { border-color:#1976d2; outline:none; }
     .small { font-size:0.85rem; color:#eee; opacity:0.9 }
-    #info { padding:8px 12px; background:#fff; border-top:1px solid #ddd; }
+    #info { padding:8px 12px; background:#f5f5f5; border-top:1px solid #ddd; font-size:14px; }
+    .label { font-weight:500; margin-right:5px; }
+    .example { font-size:12px; color:#666; margin-left:5px; }
+    .status { padding:4px 8px; background:#e3f2fd; border-radius:4px; margin-left:10px; font-size:12px; }
   </style>
 </head>
 <body>
 
 <header>
   <div style="font-weight:700">EasyMap</div>
-  <div class="small">(Leaflet + OSRM routing via backend)</div>
+  <div class="small">Enter place names or coordinates (lat,lng)</div>
 </header>
 
 <div class="controls">
-  <button id="locBtn">Use My Location</button>
-  <button id="clearBtn">Clear Markers</button>
-  <label>From: <input id="fromInput" placeholder="click on map or type lat,lng"></label>
-  <label>To: <input id="toInput" placeholder="click on map or type lat,lng"></label>
-  <button id="routeBtn">Get Directions</button>
-  <button id="saveBtn">Save Route</button>
+  <button id="locBtn">📍 Use My Location</button>
+  <button id="clearBtn">🗑️ Clear All</button>
+  
+  <div style="display:flex; align-items:center; gap:8px;">
+    <span class="label">From:</span>
+    <input id="fromInput" placeholder="Enter city, address, or coordinates" />
+    <span class="example">e.g. "New York" or "40.7128,-74.0060"</span>
+  </div>
+  
+  <div style="display:flex; align-items:center; gap:8px;">
+    <span class="label">To:</span>
+    <input id="toInput" placeholder="Enter destination" />
+  </div>
+  
+  <button id="routeBtn">🗺️ Get Directions</button>
+  <button id="saveBtn">💾 Save Route</button>
+  <span id="status" class="status" style="display:none;"></span>
 </div>
 
 <div id="map"></div>
-<div id="info">Distance: <span id="distance">—</span> • Duration: <span id="duration">—</span></div>
+<div id="info">
+  <strong>Route Info:</strong> 
+  Distance: <span id="distance">—</span> • 
+  Duration: <span id="duration">—</span> •
+  <span id="routeDetails"></span>
+</div>
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 const BACKEND = (location.hostname === 'localhost') ? 'http://localhost:4000' : 'https://test-6-ldh3.onrender.com';
-// replace 'https://your-backend.onrender.com' with your Render backend URL after deploy
 
 // initialize map
 const map = L.map('map').setView([20.5937, 78.9629], 5); // default to India
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, attribution: '© OpenStreetMap'
+  maxZoom: 19, 
+  attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
 let fromMarker = null, toMarker = null, routeLayer = null;
+let currentFromLocation = null, currentToLocation = null;
+
+// Status display functions
+function showStatus(message, isError = false) {
+  const status = document.getElementById('status');
+  status.textContent = message;
+  status.style.display = 'inline';
+  status.style.background = isError ? '#ffebee' : '#e3f2fd';
+  status.style.color = isError ? '#c62828' : '#1565c0';
+  setTimeout(() => status.style.display = 'none', 3000);
+}
 
 // helper to parse input like "12.34,56.78"
 function parseLatLng(s) {
@@ -61,133 +94,310 @@ function parseLatLng(s) {
   return null;
 }
 
-// click to set origin/destination
-map.on('click', (e) => {
-  // alternate behavior: ctrl-click sets 'from', plain click sets 'to'
-  if (window._lastClickMode === 'from') {
-    setFrom(e.latlng);
+// Check if input looks like coordinates
+function isCoordinates(input) {
+  return /^-?\d+\.?\d*,-?\d+\.?\d*$/.test(input.trim());
+}
+
+// Geocode a place name to coordinates
+async function geocodePlace(placeName) {
+  try {
+    const response = await fetch(`${BACKEND}/geocode?q=${encodeURIComponent(placeName)}`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Geocoding failed');
+    }
+    return await response.json();
+  } catch (error) {
+    throw new Error(`Could not find location "${placeName}": ${error.message}`);
+  }
+}
+
+// Process location input (either coordinates or place name)
+async function processLocationInput(input, isFrom = true) {
+  if (!input.trim()) {
+    throw new Error('Please enter a location');
+  }
+
+  let coords;
+  let displayName = input;
+
+  if (isCoordinates(input)) {
+    // Parse coordinates directly
+    const latLng = parseLatLng(input);
+    if (!latLng) throw new Error('Invalid coordinate format');
+    coords = { lat: latLng[0], lng: latLng[1] };
   } else {
-    setTo(e.latlng);
+    // Geocode place name
+    showStatus(`Finding "${input}"...`);
+    const geocoded = await geocodePlace(input);
+    coords = { lat: geocoded.lat, lng: geocoded.lon };
+    displayName = geocoded.display_name;
+  }
+
+  // Store the location data
+  if (isFrom) {
+    currentFromLocation = { coords, displayName, original: input };
+  } else {
+    currentToLocation = { coords, displayName, original: input };
+  }
+
+  return coords;
+}
+
+// Set marker on map
+function setMarker(coords, isFrom = true) {
+  const marker = L.marker([coords.lat, coords.lng], {draggable: true});
+  
+  if (isFrom) {
+    if (fromMarker) map.removeLayer(fromMarker);
+    fromMarker = marker.addTo(map).bindPopup('From: ' + (currentFromLocation?.displayName || 'Unknown')).openPopup();
+    fromMarker.on('dragend', () => updateFromDrag());
+  } else {
+    if (toMarker) map.removeLayer(toMarker);
+    toMarker = marker.addTo(map).bindPopup('To: ' + (currentToLocation?.displayName || 'Unknown')).openPopup();
+    toMarker.on('dragend', () => updateToDrag());
+  }
+}
+
+function updateFromDrag() {
+  const pos = fromMarker.getLatLng();
+  currentFromLocation = {
+    coords: { lat: pos.lat, lng: pos.lng },
+    displayName: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
+    original: `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`
+  };
+  document.getElementById('fromInput').value = currentFromLocation.original;
+}
+
+function updateToDrag() {
+  const pos = toMarker.getLatLng();
+  currentToLocation = {
+    coords: { lat: pos.lat, lng: pos.lng },
+    displayName: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
+    original: `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`
+  };
+  document.getElementById('toInput').value = currentToLocation.original;
+}
+
+// Click to set destination (simple behavior)
+map.on('click', (e) => {
+  const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
+  const coordString = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
+  
+  // Set as destination if no destination exists, otherwise set as origin
+  if (!currentToLocation) {
+    currentToLocation = {
+      coords: coords,
+      displayName: coordString,
+      original: coordString
+    };
+    document.getElementById('toInput').value = coordString;
+    setMarker(coords, false);
+  } else {
+    currentFromLocation = {
+      coords: coords,
+      displayName: coordString,
+      original: coordString
+    };
+    document.getElementById('fromInput').value = coordString;
+    setMarker(coords, true);
   }
 });
 
-// toggle mode by clicking inputs
-document.getElementById('fromInput').addEventListener('focus', ()=> window._lastClickMode='from');
-document.getElementById('toInput').addEventListener('focus', ()=> window._lastClickMode='to');
-// default to 'to' so normal clicks place destination
-window._lastClickMode = 'to';
-
-function setFrom(latlng) {
-  if (fromMarker) map.removeLayer(fromMarker);
-  fromMarker = L.marker(latlng, {draggable:true}).addTo(map).bindPopup('From').openPopup();
-  fromMarker.on('dragend', ()=> updateInputsFromMarkers());
-  document.getElementById('fromInput').value = `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`;
-}
-
-function setTo(latlng) {
-  if (toMarker) map.removeLayer(toMarker);
-  toMarker = L.marker(latlng, {draggable:true}).addTo(map).bindPopup('To').openPopup();
-  toMarker.on('dragend', ()=> updateInputsFromMarkers());
-  document.getElementById('toInput').value = `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`;
-}
-
-function updateInputsFromMarkers() {
-  if(fromMarker) {
-    const p = fromMarker.getLatLng();
-    document.getElementById('fromInput').value = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
-  }
-  if(toMarker) {
-    const p = toMarker.getLatLng();
-    document.getElementById('toInput').value = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
-  }
-}
-
+// Clear all markers and data
 document.getElementById('clearBtn').addEventListener('click', () => {
   if(fromMarker) { map.removeLayer(fromMarker); fromMarker = null; }
   if(toMarker) { map.removeLayer(toMarker); toMarker = null; }
   if(routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  
+  currentFromLocation = null;
+  currentToLocation = null;
+  
   document.getElementById('distance').textContent = '—';
   document.getElementById('duration').textContent = '—';
+  document.getElementById('routeDetails').textContent = '';
   document.getElementById('fromInput').value = '';
   document.getElementById('toInput').value = '';
+  showStatus('Cleared all markers and routes');
 });
 
+// Get current location
 document.getElementById('locBtn').addEventListener('click', ()=> {
-  // get current location
   if(!navigator.geolocation) return alert('Geolocation not supported');
+  
+  showStatus('Getting your location...');
   navigator.geolocation.getCurrentPosition(pos => {
-    const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    map.setView(latlng, 14);
-    setFrom(latlng);
-  }, err => alert('Could not get location: ' + err.message));
+    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const coordString = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
+    
+    currentFromLocation = {
+      coords: coords,
+      displayName: 'Your Location',
+      original: coordString
+    };
+    
+    document.getElementById('fromInput').value = 'Your Location';
+    map.setView([coords.lat, coords.lng], 14);
+    setMarker(coords, true);
+    showStatus('Location set as starting point');
+  }, err => {
+    showStatus('Could not get location: ' + err.message, true);
+  });
 });
 
+// Get directions
 document.getElementById('routeBtn').addEventListener('click', async ()=> {
-  // read from inputs
-  const a = parseLatLng(document.getElementById('fromInput').value) || (fromMarker && [fromMarker.getLatLng().lat, fromMarker.getLatLng().lng]);
-  const b = parseLatLng(document.getElementById('toInput').value) || (toMarker && [toMarker.getLatLng().lat, toMarker.getLatLng().lng]);
-  if(!a || !b) return alert('Please set both From and To (click map or type lat,lng).');
+  const fromInput = document.getElementById('fromInput').value.trim();
+  const toInput = document.getElementById('toInput').value.trim();
+  
+  if (!fromInput || !toInput) {
+    showStatus('Please enter both start and destination', true);
+    return;
+  }
 
-  // show loading
+  // Disable button during processing
+  const routeBtn = document.getElementById('routeBtn');
+  const originalText = routeBtn.textContent;
+  routeBtn.disabled = true;
+  routeBtn.textContent = '🔄 Finding route...';
+
+  // Show loading in info
   document.getElementById('distance').textContent = 'Loading...';
   document.getElementById('duration').textContent = 'Loading...';
 
   try {
-    const start = `${a[1]},${a[0]}`; // lon,lat for OSRM
-    const end = `${b[1]},${b[0]}`;
-    const res = await fetch(`${BACKEND}/route?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
-    if(!res.ok) throw new Error('Routing failed: ' + res.statusText);
-    const data = await res.json();
-    // data: { distance_meters, duration_seconds, geometry: GeoJSON LineString }
+    // Process locations if not already processed
+    if (!currentFromLocation || currentFromLocation.original !== fromInput) {
+      await processLocationInput(fromInput, true);
+      setMarker(currentFromLocation.coords, true);
+    }
+    
+    if (!currentToLocation || currentToLocation.original !== toInput) {
+      await processLocationInput(toInput, false);
+      setMarker(currentToLocation.coords, false);
+    }
+
+    showStatus('Calculating route...');
+    
+    // Get route using original input (let backend handle geocoding)
+    const startParam = encodeURIComponent(fromInput);
+    const endParam = encodeURIComponent(toInput);
+    const response = await fetch(`${BACKEND}/route?start=${startParam}&end=${endParam}`);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Routing failed');
+    }
+    
+    const data = await response.json();
+    
+    // Remove existing route and add new one
     if(routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.geoJSON(data.geometry, { style: { color: '#1976d2', weight: 5 } }).addTo(map);
-    map.fitBounds(routeLayer.getBounds().pad(0.2));
-    document.getElementById('distance').textContent = (data.distance_meters/1000).toFixed(2) + ' km';
-    const mins = Math.round(data.duration_seconds/60);
-    document.getElementById('duration').textContent = mins + ' min';
-  } catch (err) {
-    alert(err.message || String(err));
+    routeLayer = L.geoJSON(data.geometry, { 
+      style: { color: '#1976d2', weight: 5, opacity: 0.8 } 
+    }).addTo(map);
+    
+    // Fit map to show entire route
+    map.fitBounds(routeLayer.getBounds().pad(0.1));
+    
+    // Update info display
+    const distanceKm = (data.distance_meters / 1000).toFixed(2);
+    const durationMins = Math.round(data.duration_seconds / 60);
+    const durationHours = durationMins > 60 ? 
+      `${Math.floor(durationMins/60)}h ${durationMins%60}m` : 
+      `${durationMins} min`;
+    
+    document.getElementById('distance').textContent = `${distanceKm} km`;
+    document.getElementById('duration').textContent = durationHours;
+    document.getElementById('routeDetails').textContent = 
+      `From: ${currentFromLocation.displayName.split(',')[0]}... To: ${currentToLocation.displayName.split(',')[0]}...`;
+    
+    showStatus(`Route found! ${distanceKm} km, ${durationHours}`);
+    
+  } catch (error) {
+    console.error('Routing error:', error);
+    showStatus(error.message, true);
     document.getElementById('distance').textContent = '—';
     document.getElementById('duration').textContent = '—';
+  } finally {
+    // Re-enable button
+    routeBtn.disabled = false;
+    routeBtn.textContent = originalText;
   }
 });
 
+// Save route
 document.getElementById('saveBtn').addEventListener('click', async ()=> {
-  if(!routeLayer) return alert('No route to save. Generate a route first.');
+  if(!routeLayer) {
+    showStatus('No route to save. Generate a route first.', true);
+    return;
+  }
+  
   const name = prompt('Give a name for this route (optional)');
-  const geo = routeLayer.toGeoJSON();
+  if (name === null) return; // User cancelled
+  
+  const routeName = name || `${currentFromLocation?.displayName?.split(',')[0] || 'Unknown'} to ${currentToLocation?.displayName?.split(',')[0] || 'Unknown'}`;
+  
   try {
-    const res = await fetch(`${BACKEND}/save-route`, {
+    const geo = routeLayer.toGeoJSON();
+    const response = await fetch(`${BACKEND}/save-route`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ name: name||'Unnamed route', geo })
+      body: JSON.stringify({ name: routeName, geo })
     });
-    const j = await res.json();
-    alert(j.message || 'Saved');
-  } catch (err) {
-    alert('Save failed: ' + err.message);
+    
+    const result = await response.json();
+    showStatus(result.message || 'Route saved successfully!');
+  } catch (error) {
+    showStatus('Save failed: ' + error.message, true);
   }
 });
 
-// allow manual paste of coordinates to set markers quickly
-document.getElementById('fromInput').addEventListener('change', (e)=>{
-  const v = parseLatLng(e.target.value);
-  if(v) setFrom({lat:v[0], lng:v[1]});
-});
-document.getElementById('toInput').addEventListener('change', (e)=>{
-  const v = parseLatLng(e.target.value);
-  if(v) setTo({lat:v[0], lng:v[1]});
+// Auto-process input when user finishes typing (with debounce)
+let fromTimeout, toTimeout;
+
+document.getElementById('fromInput').addEventListener('input', (e) => {
+  clearTimeout(fromTimeout);
+  fromTimeout = setTimeout(async () => {
+    if (e.target.value.trim() && currentFromLocation?.original !== e.target.value) {
+      try {
+        await processLocationInput(e.target.value, true);
+        if (currentFromLocation) {
+          setMarker(currentFromLocation.coords, true);
+        }
+      } catch (error) {
+        // Don't show error for typing, only on route calculation
+      }
+    }
+  }, 1000);
 });
 
-// optional: load saved routes list (simple)
+document.getElementById('toInput').addEventListener('input', (e) => {
+  clearTimeout(toTimeout);
+  toTimeout = setTimeout(async () => {
+    if (e.target.value.trim() && currentToLocation?.original !== e.target.value) {
+      try {
+        await processLocationInput(e.target.value, false);
+        if (currentToLocation) {
+          setMarker(currentToLocation.coords, false);
+        }
+      } catch (error) {
+        // Don't show error for typing, only on route calculation
+      }
+    }
+  }, 1000);
+});
+
+// Load saved routes on startup (optional demo)
 async function loadSavedRoutesList() {
   try {
     const res = await fetch(`${BACKEND}/routes`);
     if(!res.ok) return;
     const list = await res.json();
-    if(list.length===0) return;
-    // place first saved route on map (for demo)
-    console.log('Saved routes:', list);
+    if(list.length > 0) {
+      console.log('Saved routes available:', list.length);
+    }
   } catch(e) { /* ignore */ }
 }
 loadSavedRoutesList();
