@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>EasyMap — Realtime Navigation</title>
+  <title>EasyMap — Live Navigation</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <style>
@@ -20,12 +20,13 @@
     }
     
     .sidebar {
-      width: 380px;
+      width: 400px;
       background: white;
       box-shadow: 2px 0 10px rgba(0,0,0,0.1);
       display: flex;
       flex-direction: column;
       z-index: 1000;
+      overflow-y: auto;
     }
     
     .header {
@@ -94,6 +95,43 @@
       100% { background-position: 200px 0; }
     }
     
+    .transport-modes {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 15px;
+    }
+    
+    .transport-mode {
+      flex: 1;
+      padding: 12px 8px;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s ease;
+      font-size: 12px;
+    }
+    
+    .transport-mode.active {
+      border-color: #4285f4;
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+    
+    .transport-mode:hover {
+      background: #f1f3f4;
+    }
+    
+    .transport-mode i {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    
     .swap-btn {
       position: absolute;
       right: 20px;
@@ -148,6 +186,28 @@
       box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
     }
     
+    .btn-success {
+      background: linear-gradient(135deg, #34a853, #137333);
+      color: white;
+    }
+    
+    .btn-success:hover:not(:disabled) {
+      background: linear-gradient(135deg, #137333, #0d652d);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(52, 168, 83, 0.3);
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #ea4335, #d33b2c);
+      color: white;
+    }
+    
+    .btn-danger:hover:not(:disabled) {
+      background: linear-gradient(135deg, #d33b2c, #b52d20);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(234, 67, 53, 0.3);
+    }
+    
     .btn-secondary {
       background: #f1f3f4;
       color: #202124;
@@ -167,7 +227,6 @@
       padding: 20px;
       background: white;
       border-top: 1px solid #e1e5e9;
-      margin-top: auto;
     }
     
     .route-card {
@@ -175,6 +234,7 @@
       border-radius: 12px;
       padding: 16px;
       border-left: 4px solid #34a853;
+      margin-bottom: 15px;
     }
     
     .route-summary {
@@ -199,6 +259,41 @@
       font-size: 13px;
       color: #5f6368;
       margin-top: 8px;
+    }
+    
+    .navigation-panel {
+      background: linear-gradient(135deg, #1a73e8, #4285f4);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 10px;
+    }
+    
+    .nav-instruction {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .nav-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    
+    .position-info {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      font-size: 13px;
+      color: #5f6368;
+    }
+    
+    .position-info strong {
+      color: #202124;
     }
     
     #map {
@@ -235,6 +330,11 @@
     .map-control-btn:hover {
       background: #f8f9fa;
       transform: translateY(-1px);
+    }
+    
+    .map-control-btn.active {
+      background: #4285f4;
+      color: white;
     }
     
     .status-toast {
@@ -275,6 +375,12 @@
       border-left: 4px solid #1565c0;
     }
     
+    .status-toast.warning {
+      background: #fff3e0;
+      color: #f57c00;
+      border-left: 4px solid #f57c00;
+    }
+    
     .connection-indicator {
       position: absolute;
       top: 20px;
@@ -297,12 +403,39 @@
       color: white;
     }
 
+    .connection-indicator.navigating {
+      background: #ff9800;
+      color: white;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .user-location-marker {
+      width: 20px;
+      height: 20px;
+      background: #4285f4;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 20px rgba(66, 133, 244, 0.5);
+      animation: locationPulse 2s infinite;
+    }
+
+    @keyframes locationPulse {
+      0% { box-shadow: 0 0 20px rgba(66, 133, 244, 0.5); }
+      50% { box-shadow: 0 0 30px rgba(66, 133, 244, 0.8); }
+      100% { box-shadow: 0 0 20px rgba(66, 133, 244, 0.5); }
+    }
+
     @media (max-width: 768px) {
       .sidebar {
         width: 100%;
         position: absolute;
         height: auto;
-        max-height: 60vh;
+        max-height: 70vh;
         bottom: 0;
         border-radius: 20px 20px 0 0;
         transform: translateY(calc(100% - 120px));
@@ -333,7 +466,7 @@
   <div class="sidebar" id="sidebar">
     <div class="header">
       <h1><i class="fas fa-map-marked-alt"></i> EasyMap</h1>
-      <p>Smart navigation & directions</p>
+      <p>Live navigation & directions</p>
     </div>
     
     <div class="search-container">
@@ -361,6 +494,22 @@
         />
       </div>
       
+      <!-- Transport Mode Selection -->
+      <div class="transport-modes">
+        <div class="transport-mode active" data-mode="driving" title="Driving">
+          <i class="fas fa-car"></i>
+          <span>Car</span>
+        </div>
+        <div class="transport-mode" data-mode="cycling" title="Cycling">
+          <i class="fas fa-bicycle"></i>
+          <span>Bike</span>
+        </div>
+        <div class="transport-mode" data-mode="foot-walking" title="Walking">
+          <i class="fas fa-walking"></i>
+          <span>Walk</span>
+        </div>
+      </div>
+      
       <div class="action-buttons">
         <button class="btn btn-primary" id="routeBtn">
           <i class="fas fa-route"></i>
@@ -369,6 +518,17 @@
         <button class="btn btn-secondary" id="locBtn">
           <i class="fas fa-crosshairs"></i>
           My Location
+        </button>
+      </div>
+      
+      <div class="action-buttons" style="margin-top: 10px;">
+        <button class="btn btn-success" id="startNavBtn" style="display: none;">
+          <i class="fas fa-play"></i>
+          Start Navigation
+        </button>
+        <button class="btn btn-danger" id="stopNavBtn" style="display: none;">
+          <i class="fas fa-stop"></i>
+          Stop Navigation
         </button>
       </div>
       
@@ -391,9 +551,25 @@
             <div class="route-time" id="duration">—</div>
             <div class="route-distance" id="distance">—</div>
           </div>
-          <i class="fas fa-car" style="font-size: 24px; color: #4285f4;"></i>
+          <i class="fas fa-car" id="routeIcon" style="font-size: 24px; color: #4285f4;"></i>
         </div>
         <div class="route-path" id="routeDetails"></div>
+      </div>
+    </div>
+    
+    <!-- Live Navigation Panel -->
+    <div class="navigation-panel" id="navigationPanel" style="display: none;">
+      <div class="nav-instruction" id="navInstruction">
+        Ready to navigate
+      </div>
+      <div class="nav-details">
+        <span id="navDistance">—</span>
+        <span id="navETA">—</span>
+      </div>
+      <div class="position-info" id="positionInfo">
+        <strong>Position:</strong> <span id="currentCoords">Unknown</span><br>
+        <strong>Speed:</strong> <span id="currentSpeed">0 km/h</span><br>
+        <strong>Accuracy:</strong> <span id="positionAccuracy">—</span>
       </div>
     </div>
   </div>
@@ -405,6 +581,9 @@
   <div class="map-controls">
     <button class="map-control-btn" id="centerBtn" title="Center on route">
       <i class="fas fa-compress-arrows-alt"></i>
+    </button>
+    <button class="map-control-btn" id="followBtn" title="Follow my location" style="display: none;">
+      <i class="fas fa-location-arrow"></i>
     </button>
     <button class="map-control-btn" id="satelliteBtn" title="Satellite view">
       <i class="fas fa-satellite"></i>
@@ -441,9 +620,27 @@ let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/se
   attribution: '© Esri'
 });
 
-let fromMarker = null, toMarker = null, routeLayer = null;
+// Global variables
+let fromMarker = null, toMarker = null, routeLayer = null, userLocationMarker = null;
 let currentFromLocation = null, currentToLocation = null;
 let isSatelliteView = false;
+let selectedTransportMode = 'driving';
+let isNavigating = false;
+let navigationWatchId = null;
+let currentPosition = null;
+let routeCoordinates = [];
+let followMode = false;
+
+// Navigation state
+const navigationState = {
+  isActive: false,
+  currentInstructionIndex: 0,
+  instructions: [],
+  totalDistance: 0,
+  totalDuration: 0,
+  remainingDistance: 0,
+  remainingTime: 0
+};
 
 // Status display
 function showStatus(message, type = 'info') {
@@ -467,6 +664,32 @@ function setInputLoading(inputId, isLoading) {
   }
 }
 
+// Transport mode selection
+document.querySelectorAll('.transport-mode').forEach(mode => {
+  mode.addEventListener('click', () => {
+    document.querySelectorAll('.transport-mode').forEach(m => m.classList.remove('active'));
+    mode.classList.add('active');
+    selectedTransportMode = mode.dataset.mode;
+    
+    // Update route icon
+    const iconMap = {
+      'driving': 'fa-car',
+      'cycling': 'fa-bicycle',
+      'foot-walking': 'fa-walking'
+    };
+    document.getElementById('routeIcon').className = `fas ${iconMap[selectedTransportMode]}`;
+    
+    showStatus(`Transport mode: ${mode.textContent}`, 'info');
+    
+    // Recalculate route if exists
+    if (currentFromLocation && currentToLocation) {
+      setTimeout(() => {
+        document.getElementById('routeBtn').click();
+      }, 500);
+    }
+  });
+});
+
 // Coordinate parsing and validation
 function parseLatLng(s) {
   if (!s) return null;
@@ -484,7 +707,7 @@ function isCoordinates(input) {
   return /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(input.trim());
 }
 
-// Direct geocoding using Nominatim (no backend dependency)
+// Direct geocoding using Nominatim
 async function geocodePlace(placeName) {
   try {
     console.log('Geocoding directly:', placeName);
@@ -593,6 +816,16 @@ function createCustomIcon(isFrom) {
   });
 }
 
+// Create user location marker
+function createUserLocationIcon() {
+  return L.divIcon({
+    className: 'user-location-marker',
+    html: '<div class="user-location-marker"></div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+}
+
 function setMarker(coords, isFrom = true) {
   const marker = L.marker([coords.lat, coords.lng], {
     draggable: true,
@@ -643,7 +876,209 @@ function updateToDrag() {
     original: coordString
   };
   document.getElementById('toInput').value = coordString;
-  showStatus('Destination updated', 'success');
+  showStatus('Destination updated');
+}
+
+// Calculate distance between two points
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Calculate bearing between two points
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2Rad);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+  const bearing = Math.atan2(y, x) * 180 / Math.PI;
+  return (bearing + 360) % 360;
+}
+
+// Update user location marker
+function updateUserLocation(position) {
+  currentPosition = position;
+  const lat = position.coords.latitude;
+  const lng = position.coords.longitude;
+  const accuracy = position.coords.accuracy;
+  const speed = position.coords.speed || 0;
+  
+  // Update/create user location marker
+  if (userLocationMarker) {
+    userLocationMarker.setLatLng([lat, lng]);
+  } else {
+    userLocationMarker = L.marker([lat, lng], {
+      icon: createUserLocationIcon()
+    }).addTo(map);
+  }
+  
+  // Update position info
+  document.getElementById('currentCoords').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  document.getElementById('currentSpeed').textContent = `${Math.round(speed * 3.6)} km/h`;
+  document.getElementById('positionAccuracy').textContent = `±${Math.round(accuracy)}m`;
+  
+  // Follow mode - center map on user location
+  if (followMode || isNavigating) {
+    map.setView([lat, lng], Math.max(map.getZoom(), 16), { animate: true });
+  }
+  
+  // Navigation logic
+  if (isNavigating && routeCoordinates.length > 0) {
+    updateNavigationProgress(lat, lng);
+  }
+}
+
+// Update navigation progress
+function updateNavigationProgress(userLat, userLng) {
+  if (!routeCoordinates.length || !currentToLocation) return;
+  
+  // Find closest point on route
+  let minDistance = Infinity;
+  let closestIndex = 0;
+  
+  for (let i = 0; i < routeCoordinates.length; i++) {
+    const coord = routeCoordinates[i];
+    const distance = calculateDistance(userLat, userLng, coord[1], coord[0]);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestIndex = i;
+    }
+  }
+  
+  // Calculate remaining distance to destination
+  const distanceToDestination = calculateDistance(
+    userLat, userLng, 
+    currentToLocation.coords.lat, currentToLocation.coords.lng
+  );
+  
+  // Update navigation display
+  const remainingKm = distanceToDestination.toFixed(1);
+  const estimatedTime = Math.round(distanceToDestination / getSpeedForMode() * 60); // minutes
+  const eta = estimatedTime >= 60 ? 
+    `${Math.floor(estimatedTime/60)}h ${estimatedTime%60}m` : 
+    `${estimatedTime} min`;
+  
+  document.getElementById('navDistance').textContent = `${remainingKm} km remaining`;
+  document.getElementById('navETA').textContent = `ETA: ${eta}`;
+  
+  // Generate navigation instruction
+  const instruction = generateNavigationInstruction(userLat, userLng, closestIndex);
+  document.getElementById('navInstruction').textContent = instruction;
+  
+  // Check if arrived (within 50 meters)
+  if (distanceToDestination < 0.05) {
+    showStatus('🎉 You have arrived at your destination!', 'success');
+    stopNavigation();
+  }
+}
+
+// Generate navigation instruction
+function generateNavigationInstruction(userLat, userLng, routeIndex) {
+  if (!routeCoordinates.length) return "Follow the route";
+  
+  const ahead = Math.min(routeIndex + 5, routeCoordinates.length - 1);
+  const nextPoint = routeCoordinates[ahead];
+  
+  if (!nextPoint) return "Continue straight";
+  
+  const bearing = calculateBearing(userLat, userLng, nextPoint[1], nextPoint[0]);
+  const distance = calculateDistance(userLat, userLng, nextPoint[1], nextPoint[0]);
+  
+  let direction = "Continue straight";
+  if (bearing >= 315 || bearing < 45) direction = "Head north";
+  else if (bearing >= 45 && bearing < 135) direction = "Head east";
+  else if (bearing >= 135 && bearing < 225) direction = "Head south";
+  else if (bearing >= 225 && bearing < 315) direction = "Head west";
+  
+  const distanceText = distance < 1 ? `${Math.round(distance * 1000)}m` : `${distance.toFixed(1)}km`;
+  
+  return `${direction} for ${distanceText}`;
+}
+
+// Get speed for transport mode (km/h)
+function getSpeedForMode() {
+  const speeds = {
+    'driving': 50,
+    'cycling': 15,
+    'foot-walking': 5
+  };
+  return speeds[selectedTransportMode] || 50;
+}
+
+// Start live navigation
+function startNavigation() {
+  if (!currentFromLocation || !currentToLocation || !routeLayer) {
+    showStatus('Please calculate a route first', 'error');
+    return;
+  }
+  
+  if (!navigator.geolocation) {
+    showStatus('Geolocation not supported', 'error');
+    return;
+  }
+  
+  isNavigating = true;
+  followMode = true;
+  
+  // Update UI
+  document.getElementById('startNavBtn').style.display = 'none';
+  document.getElementById('stopNavBtn').style.display = 'block';
+  document.getElementById('navigationPanel').style.display = 'block';
+  document.getElementById('followBtn').style.display = 'block';
+  document.getElementById('followBtn').classList.add('active');
+  
+  // Update connection indicator
+  const indicator = document.getElementById('connectionIndicator');
+  indicator.textContent = '🧭 Navigating';
+  indicator.className = 'connection-indicator navigating';
+  
+  // Start watching position
+  navigationWatchId = navigator.geolocation.watchPosition(
+    updateUserLocation,
+    (error) => {
+      console.error('Navigation position error:', error);
+      showStatus('GPS signal lost. Trying to reconnect...', 'warning');
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000
+    }
+  );
+  
+  showStatus('🧭 Live navigation started', 'success');
+}
+
+// Stop navigation
+function stopNavigation() {
+  isNavigating = false;
+  followMode = false;
+  
+  if (navigationWatchId) {
+    navigator.geolocation.clearWatch(navigationWatchId);
+    navigationWatchId = null;
+  }
+  
+  // Update UI
+  document.getElementById('startNavBtn').style.display = 'block';
+  document.getElementById('stopNavBtn').style.display = 'none';
+  document.getElementById('navigationPanel').style.display = 'none';
+  document.getElementById('followBtn').style.display = 'none';
+  document.getElementById('followBtn').classList.remove('active');
+  
+  // Update connection indicator
+  const indicator = document.getElementById('connectionIndicator');
+  indicator.textContent = '● Direct Mode';
+  indicator.className = 'connection-indicator online';
+  
+  showStatus('Navigation stopped', 'info');
 }
 
 // Map click handling
@@ -703,16 +1138,24 @@ document.getElementById('swapBtn').addEventListener('click', () => {
 
 // Clear all
 document.getElementById('clearBtn').addEventListener('click', () => {
+  // Stop navigation if active
+  if (isNavigating) {
+    stopNavigation();
+  }
+  
   if (fromMarker) { map.removeLayer(fromMarker); fromMarker = null; }
   if (toMarker) { map.removeLayer(toMarker); toMarker = null; }
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
   
   currentFromLocation = null;
   currentToLocation = null;
+  routeCoordinates = [];
   
   document.getElementById('fromInput').value = '';
   document.getElementById('toInput').value = '';
   document.getElementById('routeInfo').style.display = 'none';
+  document.getElementById('startNavBtn').style.display = 'none';
   
   showStatus('All cleared', 'success');
 });
@@ -741,6 +1184,7 @@ document.getElementById('locBtn').addEventListener('click', () => {
     document.getElementById('fromInput').value = 'Your Location';
     map.setView([coords.lat, coords.lng], 15);
     setMarker(coords, true);
+    updateUserLocation(pos);
     
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-crosshairs"></i> My Location';
@@ -762,7 +1206,7 @@ document.getElementById('locBtn').addEventListener('click', () => {
   });
 });
 
-// Direct OSRM routing (no backend dependency)
+// Direct OSRM routing with transport modes
 document.getElementById('routeBtn').addEventListener('click', async () => {
   const fromInput = document.getElementById('fromInput').value.trim();
   const toInput = document.getElementById('toInput').value.trim();
@@ -808,14 +1252,23 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
       throw new Error('Could not determine coordinates. Please try using coordinates format: lat,lng');
     }
 
-    showStatus('Calculating optimal route...');
+    showStatus(`Calculating ${selectedTransportMode} route...`);
     
-    // Use direct OSRM routing
+    // Use OSRM with different profiles
     const startCoords = `${currentFromLocation.coords.lng},${currentFromLocation.coords.lat}`;
     const endCoords = `${currentToLocation.coords.lng},${currentToLocation.coords.lat}`;
-    const routeUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords};${endCoords}?overview=full&geometries=geojson&alternatives=false&steps=false`;
     
-    console.log('Direct OSRM request:', routeUrl);
+    // Map transport modes to OSRM profiles
+    const profileMap = {
+      'driving': 'driving',
+      'cycling': 'cycling', 
+      'foot-walking': 'walking'
+    };
+    
+    const profile = profileMap[selectedTransportMode] || 'driving';
+    const routeUrl = `https://router.project-osrm.org/route/v1/${profile}/${startCoords};${endCoords}?overview=full&geometries=geojson&alternatives=false&steps=true`;
+    
+    console.log('OSRM request:', routeUrl);
     
     const response = await fetch(routeUrl);
     
@@ -827,7 +1280,7 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
     console.log('OSRM response:', data);
     
     if (!data.routes || !data.routes.length) {
-      throw new Error('No route found between these locations. They may be too far apart or unreachable by road.');
+      throw new Error('No route found between these locations. They may be too far apart or unreachable.');
     }
     
     const route = data.routes[0];
@@ -836,12 +1289,24 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
       throw new Error('Invalid route data received');
     }
     
+    // Store route coordinates for navigation
+    routeCoordinates = route.geometry.coordinates;
+    
     // Remove existing route and add new one
     if (routeLayer) map.removeLayer(routeLayer);
+    
+    // Style route based on transport mode
+    const routeStyles = {
+      'driving': { color: '#1a73e8', weight: 6 },
+      'cycling': { color: '#34a853', weight: 5 },
+      'foot-walking': { color: '#fbbc04', weight: 4 }
+    };
+    
+    const style = routeStyles[selectedTransportMode] || routeStyles['driving'];
+    
     routeLayer = L.geoJSON(route.geometry, { 
       style: { 
-        color: '#1a73e8', 
-        weight: 6, 
+        ...style,
         opacity: 0.8,
         lineJoin: 'round',
         lineCap: 'round'
@@ -865,22 +1330,28 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
     const toName = currentToLocation.displayName.split(',')[0].substring(0, 25);
     document.getElementById('routeDetails').textContent = `${fromName}... → ${toName}...`;
     
-    // Show route info panel
+    // Show route info panel and navigation button
     document.getElementById('routeInfo').style.display = 'block';
+    document.getElementById('startNavBtn').style.display = 'block';
     
-    showStatus(`✓ Route found! ${distanceKm} km in ${durationHours}`, 'success');
+    showStatus(`✓ ${selectedTransportMode} route found! ${distanceKm} km in ${durationHours}`, 'success');
     
   } catch (error) {
     console.error('Routing error:', error);
     showStatus(error.message, 'error');
     document.getElementById('routeInfo').style.display = 'none';
+    document.getElementById('startNavBtn').style.display = 'none';
   } finally {
     routeBtn.disabled = false;
     routeBtn.innerHTML = originalHTML;
   }
 });
 
-// Export route (since backend save might not work)
+// Navigation event listeners
+document.getElementById('startNavBtn').addEventListener('click', startNavigation);
+document.getElementById('stopNavBtn').addEventListener('click', stopNavigation);
+
+// Export route
 document.getElementById('saveBtn').addEventListener('click', () => {
   if (!routeLayer) {
     showStatus('No route to export. Generate a route first.', 'error');
@@ -891,6 +1362,7 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     const routeData = {
       from: currentFromLocation,
       to: currentToLocation,
+      transportMode: selectedTransportMode,
       route: routeLayer.toGeoJSON(),
       timestamp: new Date().toISOString(),
       distance: document.getElementById('distance').textContent,
@@ -903,7 +1375,7 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     
     const link = document.createElement('a');
     link.href = url;
-    link.download = `route_${Date.now()}.json`;
+    link.download = `route_${selectedTransportMode}_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -926,6 +1398,23 @@ document.getElementById('centerBtn').addEventListener('click', () => {
     showStatus('Centered on markers');
   } else {
     showStatus('No route or markers to center on', 'error');
+  }
+});
+
+// Follow mode toggle
+document.getElementById('followBtn').addEventListener('click', () => {
+  followMode = !followMode;
+  const btn = document.getElementById('followBtn');
+  
+  if (followMode) {
+    btn.classList.add('active');
+    if (currentPosition) {
+      map.setView([currentPosition.coords.latitude, currentPosition.coords.longitude], 16);
+    }
+    showStatus('Following your location', 'info');
+  } else {
+    btn.classList.remove('active');
+    showStatus('Follow mode disabled', 'info');
   }
 });
 
@@ -1030,7 +1519,21 @@ document.addEventListener('keydown', (e) => {
   }
   
   if (e.key === 'Escape') {
-    document.getElementById('clearBtn').click();
+    if (isNavigating) {
+      stopNavigation();
+    } else {
+      document.getElementById('clearBtn').click();
+    }
+  }
+  
+  // Space bar to start/stop navigation
+  if (e.key === ' ' && e.target.tagName !== 'INPUT') {
+    e.preventDefault();
+    if (isNavigating) {
+      stopNavigation();
+    } else if (routeLayer) {
+      startNavigation();
+    }
   }
 });
 
@@ -1041,6 +1544,34 @@ document.getElementById('sidebar').addEventListener('click', (e) => {
   }
 });
 
+// Voice announcements (if supported)
+function announceInstruction(text) {
+  if ('speechSynthesis' in window && isNavigating) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 0.8;
+    speechSynthesis.speak(utterance);
+  }
+}
+
+// Periodic navigation updates
+setInterval(() => {
+  if (isNavigating && currentPosition && currentToLocation) {
+    const distanceToDestination = calculateDistance(
+      currentPosition.coords.latitude, 
+      currentPosition.coords.longitude,
+      currentToLocation.coords.lat, 
+      currentToLocation.coords.lng
+    );
+    
+    // Announce major navigation events
+    if (distanceToDestination < 0.1) { // Within 100m
+      announceInstruction('You are approaching your destination');
+    }
+  }
+}, 30000); // Check every 30 seconds
+
 // Initialize app
 function initializeApp() {
   // Set focus to first input
@@ -1049,7 +1580,7 @@ function initializeApp() {
   // Show initial help
   setTimeout(() => {
     if (!document.getElementById('fromInput').value) {
-      showStatus('💡 Enter locations, use your location, or click on the map to start', 'info');
+      showStatus('💡 Select transport mode, enter locations, or click "My Location" to start', 'info');
     }
   }, 1500);
   
@@ -1059,7 +1590,7 @@ function initializeApp() {
   indicator.className = 'connection-indicator online';
   indicator.style.display = 'block';
   
-  console.log('EasyMap initialized in direct mode (no backend dependency)');
+  console.log('EasyMap initialized with live navigation capabilities');
 }
 
 // Start the app
@@ -1096,8 +1627,55 @@ style.textContent = `
   .leaflet-control-zoom a:hover {
     background: #f8f9fa;
   }
+  
+  .transport-mode.active {
+    animation: modeSelect 0.3s ease;
+  }
+  
+  @keyframes modeSelect {
+    0% { transform: scale(0.95); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+  .navigation-panel {
+    animation: slideIn 0.5s ease;
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
 `;
 document.head.appendChild(style);
+
+// Handle page visibility for navigation
+document.addEventListener('visibilitychange', () => {
+  if (isNavigating) {
+    if (document.hidden) {
+      showStatus('Navigation continues in background', 'info');
+    } else {
+      showStatus('Welcome back! Navigation active', 'success');
+    }
+  }
+});
+
+// Handle online/offline status
+window.addEventListener('online', () => {
+  if (!isNavigating) {
+    const indicator = document.getElementById('connectionIndicator');
+    indicator.textContent = '● Online';
+    indicator.className = 'connection-indicator online';
+  }
+  showStatus('Connection restored', 'success');
+});
+
+window.addEventListener('offline', () => {
+  const indicator = document.getElementById('connectionIndicator');
+  indicator.textContent = '● Offline';
+  indicator.className = 'connection-indicator offline';
+  showStatus('Working offline - GPS navigation still available', 'warning');
+});
 
 </script>
 </body>
