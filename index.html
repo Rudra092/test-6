@@ -81,7 +81,7 @@ function showStatus(message, isError = false) {
   status.style.display = 'inline';
   status.style.background = isError ? '#ffebee' : '#e3f2fd';
   status.style.color = isError ? '#c62828' : '#1565c0';
-  setTimeout(() => status.style.display = 'none', 3000);
+  setTimeout(() => status.style.display = 'none', 5000);
 }
 
 // helper to parse input like "12.34,56.78"
@@ -102,13 +102,21 @@ function isCoordinates(input) {
 // Geocode a place name to coordinates
 async function geocodePlace(placeName) {
   try {
+    console.log('Geocoding:', placeName);
     const response = await fetch(`${BACKEND}/geocode?q=${encodeURIComponent(placeName)}`);
+    console.log('Geocoding response status:', response.status);
+    
     if (!response.ok) {
       const error = await response.json();
+      console.error('Geocoding error response:', error);
       throw new Error(error.error || 'Geocoding failed');
     }
-    return await response.json();
+    
+    const result = await response.json();
+    console.log('Geocoding result:', result);
+    return result;
   } catch (error) {
+    console.error('Geocoding fetch error:', error);
     throw new Error(`Could not find location "${placeName}": ${error.message}`);
   }
 }
@@ -127,12 +135,17 @@ async function processLocationInput(input, isFrom = true) {
     const latLng = parseLatLng(input);
     if (!latLng) throw new Error('Invalid coordinate format');
     coords = { lat: latLng[0], lng: latLng[1] };
+    displayName = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
   } else {
     // Geocode place name
-    showStatus(`Finding "${input}"...`);
-    const geocoded = await geocodePlace(input);
-    coords = { lat: geocoded.lat, lng: geocoded.lon };
-    displayName = geocoded.display_name;
+    try {
+      const geocoded = await geocodePlace(input);
+      coords = { lat: geocoded.lat, lng: geocoded.lon };
+      displayName = geocoded.display_name;
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      throw error;
+    }
   }
 
   // Store the location data
@@ -246,7 +259,7 @@ document.getElementById('locBtn').addEventListener('click', ()=> {
   });
 });
 
-// Get directions
+// Get directions - MAIN FIX HERE
 document.getElementById('routeBtn').addEventListener('click', async ()=> {
   const fromInput = document.getElementById('fromInput').value.trim();
   const toInput = document.getElementById('toInput').value.trim();
@@ -267,30 +280,76 @@ document.getElementById('routeBtn').addEventListener('click', async ()=> {
   document.getElementById('duration').textContent = 'Loading...';
 
   try {
-    // Process locations if not already processed
+    // FIXED: Always process locations first to ensure we have valid coordinates
+    console.log('Processing FROM location:', fromInput);
+    
+    // Process FROM location
     if (!currentFromLocation || currentFromLocation.original !== fromInput) {
-      await processLocationInput(fromInput, true);
-      setMarker(currentFromLocation.coords, true);
+      try {
+        await processLocationInput(fromInput, true);
+        if (currentFromLocation && currentFromLocation.coords) {
+          setMarker(currentFromLocation.coords, true);
+        }
+      } catch (error) {
+        console.error('Error processing FROM location:', error);
+        throw new Error(`From location error: ${error.message}`);
+      }
     }
     
+    console.log('Processing TO location:', toInput);
+    
+    // Process TO location
     if (!currentToLocation || currentToLocation.original !== toInput) {
-      await processLocationInput(toInput, false);
-      setMarker(currentToLocation.coords, false);
+      try {
+        await processLocationInput(toInput, false);
+        if (currentToLocation && currentToLocation.coords) {
+          setMarker(currentToLocation.coords, false);
+        }
+      } catch (error) {
+        console.error('Error processing TO location:', error);
+        throw new Error(`To location error: ${error.message}`);
+      }
+    }
+
+    // Verify we have both locations
+    if (!currentFromLocation || !currentToLocation) {
+      throw new Error('Failed to process one or both locations');
     }
 
     showStatus('Calculating route...');
+    console.log('Requesting route with:', {
+      from: currentFromLocation,
+      to: currentToLocation
+    });
     
-    // Get route using original input (let backend handle geocoding)
-    const startParam = encodeURIComponent(fromInput);
-    const endParam = encodeURIComponent(toInput);
-    const response = await fetch(`${BACKEND}/route?start=${startParam}&end=${endParam}`);
+    // FIXED: Use coordinates for routing if we have them, otherwise use original input
+    let startParam, endParam;
+    
+    if (currentFromLocation.coords) {
+      startParam = `${currentFromLocation.coords.lat},${currentFromLocation.coords.lng}`;
+    } else {
+      startParam = fromInput;
+    }
+    
+    if (currentToLocation.coords) {
+      endParam = `${currentToLocation.coords.lat},${currentToLocation.coords.lng}`;
+    } else {
+      endParam = toInput;
+    }
+    
+    console.log('Route request params:', { start: startParam, end: endParam });
+    
+    const response = await fetch(`${BACKEND}/route?start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`);
+    console.log('Route response status:', response.status);
     
     if (!response.ok) {
       const error = await response.json();
+      console.error('Route error response:', error);
       throw new Error(error.error || 'Routing failed');
     }
     
     const data = await response.json();
+    console.log('Route data received:', data);
     
     // Remove existing route and add new one
     if(routeLayer) map.removeLayer(routeLayer);
@@ -310,8 +369,10 @@ document.getElementById('routeBtn').addEventListener('click', async ()=> {
     
     document.getElementById('distance').textContent = `${distanceKm} km`;
     document.getElementById('duration').textContent = durationHours;
-    document.getElementById('routeDetails').textContent = 
-      `From: ${currentFromLocation.displayName.split(',')[0]}... To: ${currentToLocation.displayName.split(',')[0]}...`;
+    
+    const fromName = currentFromLocation.displayName.split(',')[0];
+    const toName = currentToLocation.displayName.split(',')[0];
+    document.getElementById('routeDetails').textContent = `From: ${fromName}... To: ${toName}...`;
     
     showStatus(`Route found! ${distanceKm} km, ${durationHours}`);
     
@@ -320,6 +381,7 @@ document.getElementById('routeBtn').addEventListener('click', async ()=> {
     showStatus(error.message, true);
     document.getElementById('distance').textContent = '—';
     document.getElementById('duration').textContent = '—';
+    document.getElementById('routeDetails').textContent = '';
   } finally {
     // Re-enable button
     routeBtn.disabled = false;
@@ -365,12 +427,13 @@ document.getElementById('fromInput').addEventListener('input', (e) => {
         await processLocationInput(e.target.value, true);
         if (currentFromLocation) {
           setMarker(currentFromLocation.coords, true);
+          showStatus(`From location set: ${currentFromLocation.displayName.split(',')[0]}`);
         }
       } catch (error) {
-        // Don't show error for typing, only on route calculation
+        console.log('Auto-geocoding error (will retry on route):', error.message);
       }
     }
-  }, 1000);
+  }, 1500);
 });
 
 document.getElementById('toInput').addEventListener('input', (e) => {
@@ -381,13 +444,31 @@ document.getElementById('toInput').addEventListener('input', (e) => {
         await processLocationInput(e.target.value, false);
         if (currentToLocation) {
           setMarker(currentToLocation.coords, false);
+          showStatus(`To location set: ${currentToLocation.displayName.split(',')[0]}`);
         }
       } catch (error) {
-        // Don't show error for typing, only on route calculation
+        console.log('Auto-geocoding error (will retry on route):', error.message);
       }
     }
-  }, 1000);
+  }, 1500);
 });
+
+// Test backend connection on startup
+async function testConnection() {
+  try {
+    console.log('Testing backend connection to:', BACKEND);
+    const response = await fetch(`${BACKEND}/`);
+    if (response.ok) {
+      console.log('Backend connection successful');
+      showStatus('Connected to mapping service');
+    } else {
+      throw new Error('Backend responded with error');
+    }
+  } catch (error) {
+    console.error('Backend connection failed:', error);
+    showStatus('Warning: Mapping service connection failed', true);
+  }
+}
 
 // Load saved routes on startup (optional demo)
 async function loadSavedRoutesList() {
@@ -398,8 +479,13 @@ async function loadSavedRoutesList() {
     if(list.length > 0) {
       console.log('Saved routes available:', list.length);
     }
-  } catch(e) { /* ignore */ }
+  } catch(e) { 
+    console.log('Could not load saved routes:', e.message);
+  }
 }
+
+// Initialize
+testConnection();
 loadSavedRoutesList();
 
 </script>
