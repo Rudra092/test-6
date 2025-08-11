@@ -269,40 +269,32 @@
       border-left: 4px solid #137333;
     }
     
-    .suggestions {
-      background: white;
-      border: 1px solid #e1e5e9;
-      border-radius: 8px;
-      margin-top: 5px;
-      max-height: 200px;
-      overflow-y: auto;
+    .status-toast.info {
+      background: #e3f2fd;
+      color: #1565c0;
+      border-left: 4px solid #1565c0;
+    }
+    
+    .connection-indicator {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 11px;
+      font-weight: 500;
+      z-index: 1001;
       display: none;
     }
     
-    .suggestion-item {
-      padding: 12px 15px;
-      cursor: pointer;
-      border-bottom: 1px solid #f1f3f4;
-      transition: background 0.2s ease;
+    .connection-indicator.online {
+      background: #4caf50;
+      color: white;
     }
     
-    .suggestion-item:hover {
-      background: #f8f9fa;
-    }
-    
-    .suggestion-item:last-child {
-      border-bottom: none;
-    }
-    
-    .suggestion-title {
-      font-weight: 500;
-      color: #202124;
-    }
-    
-    .suggestion-address {
-      font-size: 12px;
-      color: #5f6368;
-      margin-top: 2px;
+    .connection-indicator.offline {
+      background: #ff5722;
+      color: white;
     }
 
     @media (max-width: 768px) {
@@ -350,10 +342,9 @@
         <input 
           id="fromInput" 
           class="location-input" 
-          placeholder="Choose starting point"
+          placeholder="Starting point (e.g., New York or 40.7128,-74.0060)"
           autocomplete="off"
         />
-        <div id="fromSuggestions" class="suggestions"></div>
       </div>
       
       <button class="swap-btn" id="swapBtn" title="Swap locations">
@@ -365,10 +356,9 @@
         <input 
           id="toInput" 
           class="location-input" 
-          placeholder="Choose destination"
+          placeholder="Destination (e.g., Boston or 42.3601,-71.0589)"
           autocomplete="off"
         />
-        <div id="toSuggestions" class="suggestions"></div>
       </div>
       
       <div class="action-buttons">
@@ -388,8 +378,8 @@
           Clear All
         </button>
         <button class="btn btn-secondary" id="saveBtn">
-          <i class="fas fa-bookmark"></i>
-          Save Route
+          <i class="fas fa-download"></i>
+          Export Route
         </button>
       </div>
     </div>
@@ -410,6 +400,8 @@
   
   <div id="map"></div>
   
+  <div class="connection-indicator" id="connectionIndicator"></div>
+  
   <div class="map-controls">
     <button class="map-control-btn" id="centerBtn" title="Center on route">
       <i class="fas fa-compress-arrows-alt"></i>
@@ -417,8 +409,8 @@
     <button class="map-control-btn" id="satelliteBtn" title="Satellite view">
       <i class="fas fa-satellite"></i>
     </button>
-    <button class="map-control-btn" id="trafficBtn" title="Traffic info">
-      <i class="fas fa-traffic-light"></i>
+    <button class="map-control-btn" id="fullscreenBtn" title="Fullscreen">
+      <i class="fas fa-expand"></i>
     </button>
   </div>
 </div>
@@ -428,8 +420,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const BACKEND = (location.hostname === 'localhost') ? 'http://localhost:4000' : 'https://test-6-ldh3.onrender.com';
-
 // Initialize map with better styling
 const map = L.map('map', {
   zoomControl: false
@@ -440,7 +430,7 @@ L.control.zoom({
   position: 'bottomright'
 }).addTo(map);
 
-// Default tile layer
+// Map layers
 let currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, 
   attribution: '© OpenStreetMap contributors'
@@ -455,7 +445,7 @@ let fromMarker = null, toMarker = null, routeLayer = null;
 let currentFromLocation = null, currentToLocation = null;
 let isSatelliteView = false;
 
-// Enhanced status display
+// Status display
 function showStatus(message, type = 'info') {
   const toast = document.getElementById('statusToast');
   toast.textContent = message;
@@ -477,7 +467,7 @@ function setInputLoading(inputId, isLoading) {
   }
 }
 
-// Enhanced coordinate parsing
+// Coordinate parsing and validation
 function parseLatLng(s) {
   if (!s) return null;
   const parts = s.split(',').map(p => p.trim());
@@ -494,46 +484,44 @@ function isCoordinates(input) {
   return /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(input.trim());
 }
 
-// Enhanced geocoding with better error handling
+// Direct geocoding using Nominatim (no backend dependency)
 async function geocodePlace(placeName) {
   try {
-    console.log('Geocoding:', placeName);
-    const response = await fetch(`${BACKEND}/geocode?q=${encodeURIComponent(placeName)}`, {
+    console.log('Geocoding directly:', placeName);
+    showStatus('Finding location...');
+    
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1&addressdetails=1`;
+    
+    const response = await fetch(url, {
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'User-Agent': 'EasyMap/1.0 (Educational)'
       }
     });
     
     if (!response.ok) {
-      let errorMessage = 'Geocoding service error';
-      try {
-        const error = await response.json();
-        errorMessage = error.error || errorMessage;
-      } catch (e) {
-        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      }
-      throw new Error(errorMessage);
+      throw new Error(`Location search failed (${response.status}). Please try coordinates instead.`);
     }
     
-    const result = await response.json();
-    console.log('Geocoding result:', result);
-    
-    if (!result.lat || !result.lon) {
-      throw new Error('Invalid geocoding response');
+    const results = await response.json();
+    if (!results || results.length === 0) {
+      throw new Error(`No location found for "${placeName}". Try being more specific or use coordinates (lat,lng).`);
     }
     
-    return result;
+    const result = results[0];
+    console.log('Geocoding successful:', result);
+    
+    return {
+      lat: parseFloat(result.lat),
+      lon: parseFloat(result.lon),
+      display_name: result.display_name
+    };
   } catch (error) {
     console.error('Geocoding error:', error);
-    if (error.message.includes('fetch')) {
-      throw new Error('Connection error - please check your internet connection');
-    }
-    throw error;
+    throw new Error(`Location search failed for "${placeName}". ${error.message}`);
   }
 }
 
-// Enhanced location processing
+// Process location input with robust error handling
 async function processLocationInput(input, isFrom = true) {
   const inputId = isFrom ? 'fromInput' : 'toInput';
   setInputLoading(inputId, true);
@@ -548,18 +536,23 @@ async function processLocationInput(input, isFrom = true) {
 
     if (isCoordinates(input)) {
       const latLng = parseLatLng(input);
-      if (!latLng) throw new Error('Invalid coordinate format. Use: latitude,longitude');
+      if (!latLng) throw new Error('Invalid coordinate format. Use: latitude,longitude (e.g., 40.7128,-74.0060)');
       coords = { lat: latLng[0], lng: latLng[1] };
       displayName = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+      console.log('Using coordinates:', coords);
     } else {
-      const geocoded = await geocodePlace(input);
-      coords = { lat: geocoded.lat, lng: geocoded.lon };
-      displayName = geocoded.display_name;
+      try {
+        const geocoded = await geocodePlace(input);
+        coords = { lat: geocoded.lat, lng: geocoded.lon };
+        displayName = geocoded.display_name;
+      } catch (geocodeError) {
+        throw new Error(`${geocodeError.message} Try using coordinates like: 40.7128,-74.0060`);
+      }
     }
 
     // Validate coordinates
     if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
-      throw new Error('Invalid coordinates received');
+      throw new Error('Invalid coordinates received. Please try again.');
     }
 
     const locationData = { coords, displayName, original: input.trim() };
@@ -576,7 +569,7 @@ async function processLocationInput(input, isFrom = true) {
   }
 }
 
-// Enhanced marker creation
+// Create custom markers
 function createCustomIcon(isFrom) {
   return L.divIcon({
     className: 'custom-marker',
@@ -638,7 +631,7 @@ function updateFromDrag() {
     original: coordString
   };
   document.getElementById('fromInput').value = coordString;
-  showStatus('Starting point updated');
+  showStatus('Starting point updated', 'success');
 }
 
 function updateToDrag() {
@@ -650,10 +643,10 @@ function updateToDrag() {
     original: coordString
   };
   document.getElementById('toInput').value = coordString;
-  showStatus('Destination updated');
+  showStatus('Destination updated', 'success');
 }
 
-// Enhanced map click handling
+// Map click handling
 map.on('click', (e) => {
   const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
   const coordString = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
@@ -666,7 +659,7 @@ map.on('click', (e) => {
     };
     document.getElementById('fromInput').value = coordString;
     setMarker(coords, true);
-    showStatus('Starting point set');
+    showStatus('Starting point set', 'success');
   } else if (!currentToLocation) {
     currentToLocation = {
       coords: coords,
@@ -675,7 +668,7 @@ map.on('click', (e) => {
     };
     document.getElementById('toInput').value = coordString;
     setMarker(coords, false);
-    showStatus('Destination set');
+    showStatus('Destination set', 'success');
   } else {
     // Replace destination with new click
     currentToLocation = {
@@ -685,7 +678,7 @@ map.on('click', (e) => {
     };
     document.getElementById('toInput').value = coordString;
     setMarker(coords, false);
-    showStatus('Destination updated');
+    showStatus('Destination updated', 'success');
   }
 });
 
@@ -694,21 +687,18 @@ document.getElementById('swapBtn').addEventListener('click', () => {
   const fromInput = document.getElementById('fromInput');
   const toInput = document.getElementById('toInput');
   
-  // Swap input values
   const tempValue = fromInput.value;
   fromInput.value = toInput.value;
   toInput.value = tempValue;
   
-  // Swap location data
   const tempLocation = currentFromLocation;
   currentFromLocation = currentToLocation;
   currentToLocation = tempLocation;
   
-  // Update markers
   if (currentFromLocation) setMarker(currentFromLocation.coords, true);
   if (currentToLocation) setMarker(currentToLocation.coords, false);
   
-  showStatus('Locations swapped');
+  showStatus('Locations swapped', 'success');
 });
 
 // Clear all
@@ -758,15 +748,21 @@ document.getElementById('locBtn').addEventListener('click', () => {
   }, err => {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-crosshairs"></i> My Location';
-    showStatus(`Location error: ${err.message}`, 'error');
+    
+    let errorMsg = 'Location access denied';
+    if (err.code === 1) errorMsg = 'Location access denied. Please allow location access.';
+    else if (err.code === 2) errorMsg = 'Location unavailable. Please try again.';
+    else if (err.code === 3) errorMsg = 'Location request timed out. Please try again.';
+    
+    showStatus(errorMsg, 'error');
   }, {
     enableHighAccuracy: true,
-    timeout: 10000,
+    timeout: 15000,
     maximumAge: 300000
   });
 });
 
-// Enhanced routing with better error handling
+// Direct OSRM routing (no backend dependency)
 document.getElementById('routeBtn').addEventListener('click', async () => {
   const fromInput = document.getElementById('fromInput').value.trim();
   const toInput = document.getElementById('toInput').value.trim();
@@ -782,26 +778,23 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
   routeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finding route...';
 
   try {
-    // Process locations with enhanced error handling
-    console.log('Processing FROM location:', fromInput);
-    
+    // Process FROM location
     if (!currentFromLocation || currentFromLocation.original !== fromInput) {
       try {
-        showStatus('Finding starting location...');
+        showStatus('Locating starting point...');
         await processLocationInput(fromInput, true);
         if (currentFromLocation?.coords) {
           setMarker(currentFromLocation.coords, true);
         }
       } catch (error) {
-        throw new Error(`Starting location: ${error.message}`);
+        throw new Error(`Starting point: ${error.message}`);
       }
     }
     
-    console.log('Processing TO location:', toInput);
-    
+    // Process TO location
     if (!currentToLocation || currentToLocation.original !== toInput) {
       try {
-        showStatus('Finding destination...');
+        showStatus('Locating destination...');
         await processLocationInput(toInput, false);
         if (currentToLocation?.coords) {
           setMarker(currentToLocation.coords, false);
@@ -812,44 +805,40 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
     }
 
     if (!currentFromLocation?.coords || !currentToLocation?.coords) {
-      throw new Error('Could not determine coordinates for one or both locations');
+      throw new Error('Could not determine coordinates. Please try using coordinates format: lat,lng');
     }
 
-    showStatus('Calculating best route...');
+    showStatus('Calculating optimal route...');
     
-    // Build route request with coordinates
-    const startParam = `${currentFromLocation.coords.lat},${currentFromLocation.coords.lng}`;
-    const endParam = `${currentToLocation.coords.lat},${currentToLocation.coords.lng}`;
+    // Use direct OSRM routing
+    const startCoords = `${currentFromLocation.coords.lng},${currentFromLocation.coords.lat}`;
+    const endCoords = `${currentToLocation.coords.lng},${currentToLocation.coords.lat}`;
+    const routeUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords};${endCoords}?overview=full&geometries=geojson&alternatives=false&steps=false`;
     
-    console.log('Route request:', { start: startParam, end: endParam });
+    console.log('Direct OSRM request:', routeUrl);
     
-    const response = await fetch(`${BACKEND}/route?start=${encodeURIComponent(startParam)}&end=${encodeURIComponent(endParam)}`, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
+    const response = await fetch(routeUrl);
     
     if (!response.ok) {
-      let errorMessage = 'Routing service error';
-      try {
-        const error = await response.json();
-        errorMessage = error.error || errorMessage;
-      } catch (e) {
-        errorMessage = `HTTP ${response.status}: Unable to calculate route`;
-      }
-      throw new Error(errorMessage);
+      throw new Error(`Routing service error (${response.status}). Please check your internet connection.`);
     }
     
     const data = await response.json();
-    console.log('Route data:', data);
+    console.log('OSRM response:', data);
     
-    if (!data.geometry) {
-      throw new Error('No route geometry received');
+    if (!data.routes || !data.routes.length) {
+      throw new Error('No route found between these locations. They may be too far apart or unreachable by road.');
+    }
+    
+    const route = data.routes[0];
+    
+    if (!route.geometry) {
+      throw new Error('Invalid route data received');
     }
     
     // Remove existing route and add new one
     if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.geoJSON(data.geometry, { 
+    routeLayer = L.geoJSON(route.geometry, { 
       style: { 
         color: '#1a73e8', 
         weight: 6, 
@@ -859,12 +848,12 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
       } 
     }).addTo(map);
     
-    // Fit map to show entire route with padding
+    // Fit map to show entire route
     map.fitBounds(routeLayer.getBounds().pad(0.1));
     
     // Update info display
-    const distanceKm = (data.distance_meters / 1000).toFixed(1);
-    const durationMins = Math.round(data.duration_seconds / 60);
+    const distanceKm = (route.distance / 1000).toFixed(1);
+    const durationMins = Math.round(route.duration / 60);
     const durationHours = durationMins >= 60 ? 
       `${Math.floor(durationMins/60)}h ${durationMins%60}m` : 
       `${durationMins} min`;
@@ -879,7 +868,7 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
     // Show route info panel
     document.getElementById('routeInfo').style.display = 'block';
     
-    showStatus(`Route found! ${distanceKm} km in ${durationHours}`, 'success');
+    showStatus(`✓ Route found! ${distanceKm} km in ${durationHours}`, 'success');
     
   } catch (error) {
     console.error('Routing error:', error);
@@ -891,35 +880,38 @@ document.getElementById('routeBtn').addEventListener('click', async () => {
   }
 });
 
-// Save route
-document.getElementById('saveBtn').addEventListener('click', async () => {
+// Export route (since backend save might not work)
+document.getElementById('saveBtn').addEventListener('click', () => {
   if (!routeLayer) {
-    showStatus('No route to save. Generate a route first.', 'error');
+    showStatus('No route to export. Generate a route first.', 'error');
     return;
   }
   
-  const name = prompt('Give a name for this route:');
-  if (name === null) return; // User cancelled
-  
-  const routeName = name || `${currentFromLocation?.displayName?.split(',')[0] || 'Start'} to ${currentToLocation?.displayName?.split(',')[0] || 'End'}`;
-  
   try {
-    const geo = routeLayer.toGeoJSON();
-    const response = await fetch(`${BACKEND}/save-route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: routeName, geo })
-    });
+    const routeData = {
+      from: currentFromLocation,
+      to: currentToLocation,
+      route: routeLayer.toGeoJSON(),
+      timestamp: new Date().toISOString(),
+      distance: document.getElementById('distance').textContent,
+      duration: document.getElementById('duration').textContent
+    };
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Save failed');
-    }
+    const dataStr = JSON.stringify(routeData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
     
-    const result = await response.json();
-    showStatus(result.message || 'Route saved successfully!', 'success');
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `route_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showStatus('Route exported successfully!', 'success');
   } catch (error) {
-    showStatus(`Save failed: ${error.message}`, 'error');
+    showStatus('Export failed: ' + error.message, 'error');
   }
 });
 
@@ -946,19 +938,25 @@ document.getElementById('satelliteBtn').addEventListener('click', () => {
     btn.innerHTML = '<i class="fas fa-satellite"></i>';
     btn.title = 'Satellite view';
     isSatelliteView = false;
-    showStatus('Switched to map view');
+    showStatus('Map view enabled');
   } else {
     map.removeLayer(currentTileLayer);
     satelliteLayer.addTo(map);
     btn.innerHTML = '<i class="fas fa-map"></i>';
     btn.title = 'Map view';
     isSatelliteView = true;
-    showStatus('Switched to satellite view');
+    showStatus('Satellite view enabled');
   }
 });
 
-document.getElementById('trafficBtn').addEventListener('click', () => {
-  showStatus('Traffic data coming soon!');
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+    showStatus('Fullscreen enabled');
+  } else {
+    document.exitFullscreen();
+    showStatus('Fullscreen disabled');
+  }
 });
 
 // Auto-processing with debounce
@@ -985,13 +983,13 @@ document.getElementById('fromInput').addEventListener('input', (e) => {
         await processLocationInput(value, true);
         if (currentFromLocation?.coords) {
           setMarker(currentFromLocation.coords, true);
-          showStatus(`Starting point: ${currentFromLocation.displayName.split(',')[0]}`, 'success');
+          showStatus(`✓ Starting point: ${currentFromLocation.displayName.split(',')[0]}`, 'success');
         }
       } catch (error) {
-        console.log('Auto-processing error (will retry on route):', error.message);
+        console.log('Auto-processing error:', error.message);
       }
     }
-  }, 2000);
+  }, 2500);
 });
 
 document.getElementById('toInput').addEventListener('input', (e) => {
@@ -1015,35 +1013,14 @@ document.getElementById('toInput').addEventListener('input', (e) => {
         await processLocationInput(value, false);
         if (currentToLocation?.coords) {
           setMarker(currentToLocation.coords, false);
-          showStatus(`Destination: ${currentToLocation.displayName.split(',')[0]}`, 'success');
+          showStatus(`✓ Destination: ${currentToLocation.displayName.split(',')[0]}`, 'success');
         }
       } catch (error) {
-        console.log('Auto-processing error (will retry on route):', error.message);
+        console.log('Auto-processing error:', error.message);
       }
     }
-  }, 2000);
+  }, 2500);
 });
-
-// Enhanced connection testing
-async function testConnection() {
-  try {
-    console.log('Testing backend connection...');
-    const response = await fetch(`${BACKEND}/`, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    });
-    
-    if (response.ok) {
-      console.log('Backend connection successful');
-      showStatus('Connected to navigation service', 'success');
-    } else {
-      throw new Error(`Backend responded with status ${response.status}`);
-    }
-  } catch (error) {
-    console.error('Backend connection failed:', error);
-    showStatus('Warning: Navigation service unavailable. Some features may not work.', 'error');
-  }
-}
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
@@ -1058,45 +1035,37 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Mobile sidebar toggle
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('expanded');
-}
-
-// Add touch gesture for mobile
-let touchStartY = 0;
-document.getElementById('sidebar').addEventListener('touchstart', (e) => {
-  touchStartY = e.touches[0].clientY;
-});
-
-document.getElementById('sidebar').addEventListener('touchmove', (e) => {
-  if (window.innerWidth <= 768) {
-    const touchY = e.touches[0].clientY;
-    const deltaY = touchStartY - touchY;
-    
-    if (deltaY > 50) { // Swipe up
-      document.getElementById('sidebar').classList.add('expanded');
-    } else if (deltaY < -50) { // Swipe down
-      document.getElementById('sidebar').classList.remove('expanded');
-    }
+document.getElementById('sidebar').addEventListener('click', (e) => {
+  if (window.innerWidth <= 768 && e.target === document.getElementById('sidebar')) {
+    document.getElementById('sidebar').classList.toggle('expanded');
   }
 });
 
 // Initialize app
-async function initializeApp() {
-  await testConnection();
-  
+function initializeApp() {
   // Set focus to first input
   document.getElementById('fromInput').focus();
   
-  // Add some example locations for demonstration
-  console.log('EasyMap initialized successfully');
+  // Show initial help
+  setTimeout(() => {
+    if (!document.getElementById('fromInput').value) {
+      showStatus('💡 Enter locations, use your location, or click on the map to start', 'info');
+    }
+  }, 1500);
+  
+  // Set connection indicator
+  const indicator = document.getElementById('connectionIndicator');
+  indicator.textContent = '● Direct Mode';
+  indicator.className = 'connection-indicator online';
+  indicator.style.display = 'block';
+  
+  console.log('EasyMap initialized in direct mode (no backend dependency)');
 }
 
 // Start the app
 initializeApp();
 
-// Add some CSS animations for better UX
+// Add CSS animations
 const style = document.createElement('style');
 style.textContent = `
   .custom-marker {
@@ -1106,10 +1075,6 @@ style.textContent = `
   @keyframes markerDrop {
     0% { transform: translateY(-20px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
-  }
-  
-  .leaflet-routing-container {
-    display: none;
   }
   
   .leaflet-control-container .leaflet-control-zoom {
@@ -1124,6 +1089,12 @@ style.textContent = `
     font-size: 18px;
     border-radius: 8px;
     margin: 2px;
+    background: white;
+    color: #666;
+  }
+  
+  .leaflet-control-zoom a:hover {
+    background: #f8f9fa;
   }
 `;
 document.head.appendChild(style);
