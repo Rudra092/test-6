@@ -1,1104 +1,1199 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>EasyMap — Realtime Navigation</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    body { 
-      margin: 0; 
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-      background: #f8f9fa;
-      overflow: hidden;
-    }
-    
-    .app-container {
-      display: flex;
-      height: 100vh;
-    }
-    
-    .sidebar {
-      width: 380px;
-      background: white;
-      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      z-index: 1000;
-    }
-    
-    .header {
-      background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    
-    .header h1 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 600;
-    }
-    
-    .header p {
-      margin: 5px 0 0 0;
-      opacity: 0.9;
-      font-size: 14px;
-    }
-    
-    .search-container {
-      padding: 20px;
-      background: white;
-    }
-    
-    .input-group {
-      position: relative;
-      margin-bottom: 15px;
-    }
-    
-    .input-group i {
-      position: absolute;
-      left: 15px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #666;
-      z-index: 2;
-    }
-    
-    .location-input {
-      width: 100%;
-      padding: 15px 15px 15px 45px;
-      border: 2px solid #e1e5e9;
-      border-radius: 25px;
-      font-size: 16px;
-      transition: all 0.3s ease;
-      background: white;
-    }
-    
-    .location-input:focus {
-      border-color: #4285f4;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
-    }
-    
-    .location-input.loading {
-      background: #f8f9fa;
-      background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
-      background-size: 200px 100%;
-      animation: shimmer 1.5s infinite;
-    }
-    
-    @keyframes shimmer {
-      0% { background-position: -200px 0; }
-      100% { background-position: 200px 0; }
-    }
-    
-    .swap-btn {
-      position: absolute;
-      right: 20px;
-      top: 35px;
-      background: #f1f3f4;
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-      z-index: 3;
-    }
-    
-    .swap-btn:hover {
-      background: #e8eaed;
-      transform: rotate(180deg);
-    }
-    
-    .action-buttons {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-    
-    .btn {
-      flex: 1;
-      padding: 12px 20px;
-      border: none;
-      border-radius: 25px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, #4285f4, #1a73e8);
-      color: white;
-    }
-    
-    .btn-primary:hover:not(:disabled) {
-      background: linear-gradient(135deg, #1a73e8, #1557b0);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
-    }
-    
-    .btn-secondary {
-      background: #f1f3f4;
-      color: #202124;
-    }
-    
-    .btn-secondary:hover:not(:disabled) {
-      background: #e8eaed;
-    }
-    
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none !important;
-    }
-    
-    .route-info {
-      padding: 20px;
-      background: white;
-      border-top: 1px solid #e1e5e9;
-      margin-top: auto;
-    }
-    
-    .route-card {
-      background: linear-gradient(135deg, #e8f5e8, #f0f8ff);
-      border-radius: 12px;
-      padding: 16px;
-      border-left: 4px solid #34a853;
-    }
-    
-    .route-summary {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    
-    .route-time {
-      font-size: 20px;
-      font-weight: 600;
-      color: #1a73e8;
-    }
-    
-    .route-distance {
-      font-size: 14px;
-      color: #5f6368;
-    }
-    
-    .route-path {
-      font-size: 13px;
-      color: #5f6368;
-      margin-top: 8px;
-    }
-    
-    #map {
-      flex: 1;
-      position: relative;
-    }
-    
-    .map-controls {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    
-    .map-control-btn {
-      width: 45px;
-      height: 45px;
-      background: white;
-      border: none;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      color: #5f6368;
-      transition: all 0.2s ease;
-    }
-    
-    .map-control-btn:hover {
-      background: #f8f9fa;
-      transform: translateY(-1px);
-    }
-    
-    .status-toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      padding: 12px 20px;
-      border-radius: 25px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      font-size: 14px;
-      z-index: 2000;
-      display: none;
-      animation: slideUp 0.3s ease;
-    }
-    
-    @keyframes slideUp {
-      from { transform: translateX(-50%) translateY(100%); opacity: 0; }
-      to { transform: translateX(-50%) translateY(0); opacity: 1; }
-    }
-    
-    .status-toast.error {
-      background: #fce8e6;
-      color: #d93025;
-      border-left: 4px solid #d93025;
-    }
-    
-    .status-toast.success {
-      background: #e6f4ea;
-      color: #137333;
-      border-left: 4px solid #137333;
-    }
-    
-    .status-toast.info {
-      background: #e3f2fd;
-      color: #1565c0;
-      border-left: 4px solid #1565c0;
-    }
-    
-    .connection-indicator {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      padding: 6px 12px;
-      border-radius: 15px;
-      font-size: 11px;
-      font-weight: 500;
-      z-index: 1001;
-      display: none;
-    }
-    
-    .connection-indicator.online {
-      background: #4caf50;
-      color: white;
-    }
-    
-    .connection-indicator.offline {
-      background: #ff5722;
-      color: white;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NaviMaps - Interactive Navigation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    @media (max-width: 768px) {
-      .sidebar {
-        width: 100%;
-        position: absolute;
-        height: auto;
-        max-height: 60vh;
-        bottom: 0;
-        border-radius: 20px 20px 0 0;
-        transform: translateY(calc(100% - 120px));
-        transition: transform 0.3s ease;
-      }
-      
-      .sidebar.expanded {
-        transform: translateY(0);
-      }
-      
-      .sidebar::before {
-        content: '';
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: #dadce0;
-        border-radius: 2px;
-      }
-    }
-  </style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        .header {
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.9);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: white;
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #4CAF50;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background: #45a049;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .route-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .route-input {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255,255,255,0.85);
+            transition: all 0.3s ease;
+        }
+
+        .route-input:focus {
+            outline: none;
+            background: white;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+
+        .transport-modes {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: space-around;
+        }
+
+        .transport-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .transport-btn.active {
+            background: #4CAF50;
+            box-shadow: 0 5px 15px rgba(76,175,80,0.4);
+            transform: translateY(-2px);
+        }
+
+        .transport-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+
+        .features {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .feature-section {
+            margin-bottom: 25px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .feature-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle.active {
+            background: #4CAF50;
+        }
+
+        .toggle::before {
+            content: '';
+            position: absolute;
+            width: 21px;
+            height: 21px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .toggle.active::before {
+            transform: translateX(25px);
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            overflow: hidden;
+        }
+
+        .map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(120, 219, 255, 0.3) 0%, transparent 50%),
+                linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .street {
+            position: absolute;
+            background: rgba(255,255,255,0.8);
+            border-radius: 2px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .street.traffic-heavy {
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .street.traffic-medium {
+            background: #ffaa44;
+        }
+
+        .street.traffic-light {
+            background: #44ff44;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .route-line {
+            position: absolute;
+            background: #2196F3;
+            height: 4px;
+            border-radius: 2px;
+            z-index: 100;
+            animation: routeAnimation 3s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(33,150,243,0.5);
+        }
+
+        @keyframes routeAnimation {
+            0%, 100% { box-shadow: 0 0 10px rgba(33,150,243,0.5); }
+            50% { box-shadow: 0 0 20px rgba(33,150,243,0.8); }
+        }
+
+        .marker {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #ff4444;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            z-index: 200;
+            animation: markerBounce 2s ease-in-out infinite;
+            cursor: pointer;
+        }
+
+        @keyframes markerBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .marker.start {
+            background: #4CAF50;
+        }
+
+        .marker.end {
+            background: #ff4444;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-size: 18px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .navigation-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 20px 30px;
+            border-radius: 25px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .navigation-panel.active {
+            display: block;
+            animation: slideDown 0.5s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        .nav-instruction {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .nav-distance {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .traffic-legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 2000;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                height: 100vh;
+                z-index: 2000;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .map-container {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 <body>
-
-<div class="app-container">
-  <div class="sidebar" id="sidebar">
-    <div class="header">
-      <h1><i class="fas fa-map-marked-alt"></i> EasyMap</h1>
-      <p>Smart navigation & directions</p>
-    </div>
-    
-    <div class="search-container">
-      <div class="input-group">
-        <i class="fas fa-circle" style="color: #4285f4;"></i>
-        <input 
-          id="fromInput" 
-          class="location-input" 
-          placeholder="Starting point (e.g., New York or 40.7128,-74.0060)"
-          autocomplete="off"
-        />
-      </div>
-      
-      <button class="swap-btn" id="swapBtn" title="Swap locations">
-        <i class="fas fa-exchange-alt"></i>
-      </button>
-      
-      <div class="input-group">
-        <i class="fas fa-map-marker-alt" style="color: #ea4335;"></i>
-        <input 
-          id="toInput" 
-          class="location-input" 
-          placeholder="Destination (e.g., Boston or 42.3601,-71.0589)"
-          autocomplete="off"
-        />
-      </div>
-      
-      <div class="action-buttons">
-        <button class="btn btn-primary" id="routeBtn">
-          <i class="fas fa-route"></i>
-          Get Directions
-        </button>
-        <button class="btn btn-secondary" id="locBtn">
-          <i class="fas fa-crosshairs"></i>
-          My Location
-        </button>
-      </div>
-      
-      <div class="action-buttons" style="margin-top: 10px;">
-        <button class="btn btn-secondary" id="clearBtn">
-          <i class="fas fa-trash-alt"></i>
-          Clear All
-        </button>
-        <button class="btn btn-secondary" id="saveBtn">
-          <i class="fas fa-download"></i>
-          Export Route
-        </button>
-      </div>
-    </div>
-    
-    <div class="route-info" id="routeInfo" style="display: none;">
-      <div class="route-card">
-        <div class="route-summary">
-          <div>
-            <div class="route-time" id="duration">—</div>
-            <div class="route-distance" id="distance">—</div>
-          </div>
-          <i class="fas fa-car" style="font-size: 24px; color: #4285f4;"></i>
+    <div class="app-container">
+        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+        
+        <div class="sidebar" id="sidebar">
+            <div class="header">
+                <div class="logo">
+                    🗺️ NaviMaps
+                </div>
+                
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Search places..." id="searchInput">
+                    <button class="search-btn" onclick="search()">🔍</button>
+                </div>
+                
+                <div class="route-inputs">
+                    <input type="text" class="route-input" placeholder="From: Your location" id="fromInput" value="Current Location">
+                    <input type="text" class="route-input" placeholder="To: Choose destination" id="toInput">
+                </div>
+                
+                <div class="transport-modes">
+                    <button class="transport-btn active" data-mode="car" onclick="selectTransport('car')">🚗<br>Car</button>
+                    <button class="transport-btn" data-mode="bike" onclick="selectTransport('bike')">🚴<br>Bike</button>
+                    <button class="transport-btn" data-mode="walk" onclick="selectTransport('walk')">🚶<br>Walk</button>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature-section">
+                    <div class="feature-title">Traffic Information</div>
+                    <div class="toggle-container">
+                        <span>Live Traffic</span>
+                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="traffic"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Traffic Alerts</span>
+                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="alerts"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-section">
+                    <div class="feature-title">Map Layers</div>
+                    <div class="toggle-container">
+                        <span>Satellite View</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="satellite"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Street View</span>
+                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="street"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>3D Buildings</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="3d"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-section">
+                    <div class="feature-title">Points of Interest</div>
+                    <div class="toggle-container">
+                        <span>Gas Stations</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="gas"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Restaurants</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="restaurants"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Hotels</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="hotels"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-section">
+                    <div class="feature-title">Navigation</div>
+                    <div class="toggle-container">
+                        <span>Voice Guidance</span>
+                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="voice"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Avoid Tolls</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="tolls"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span>Avoid Highways</span>
+                        <div class="toggle" onclick="toggleFeature(this)" data-feature="highways"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="route-path" id="routeDetails"></div>
-      </div>
+        
+        <div class="map-container">
+            <div class="map" id="map">
+                <div class="map-overlay" id="mapOverlay"></div>
+            </div>
+            
+            <div class="navigation-panel" id="navigationPanel">
+                <div class="nav-instruction" id="navInstruction">Turn right onto Main Street</div>
+                <div class="nav-distance" id="navDistance">In 500 meters</div>
+            </div>
+            
+            <div class="traffic-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #44ff44;"></div>
+                    <span>Light Traffic</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffaa44;"></div>
+                    <span>Medium Traffic</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff4444;"></div>
+                    <span>Heavy Traffic</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn" onclick="zoomIn()" title="Zoom In">+</button>
+                <button class="control-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+                <button class="control-btn" onclick="centerLocation()" title="My Location">📍</button>
+                <button class="control-btn" onclick="startNavigation()" title="Start Navigation">🧭</button>
+            </div>
+        </div>
     </div>
-  </div>
-  
-  <div id="map"></div>
-  
-  <div class="connection-indicator" id="connectionIndicator"></div>
-  
-  <div class="map-controls">
-    <button class="map-control-btn" id="centerBtn" title="Center on route">
-      <i class="fas fa-compress-arrows-alt"></i>
-    </button>
-    <button class="map-control-btn" id="satelliteBtn" title="Satellite view">
-      <i class="fas fa-satellite"></i>
-    </button>
-    <button class="map-control-btn" id="fullscreenBtn" title="Fullscreen">
-      <i class="fas fa-expand"></i>
-    </button>
-  </div>
-</div>
 
-<div id="statusToast" class="status-toast"></div>
+    <script>
+        // Global variables
+        let currentTransportMode = 'car';
+        let isNavigating = false;
+        let navigationInterval;
+        let zoomLevel = 1;
+        let features = {
+            traffic: true,
+            alerts: true,
+            satellite: false,
+            street: true,
+            '3d': false,
+            gas: false,
+            restaurants: false,
+            hotels: false,
+            voice: true,
+            tolls: false,
+            highways: false
+        };
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-// Initialize map with better styling
-const map = L.map('map', {
-  zoomControl: false
-}).setView([20.5937, 78.9629], 5);
-
-// Add custom zoom control
-L.control.zoom({
-  position: 'bottomright'
-}).addTo(map);
-
-// Map layers
-let currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19, 
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
-
-let satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19,
-  attribution: '© Esri'
-});
-
-let fromMarker = null, toMarker = null, routeLayer = null;
-let currentFromLocation = null, currentToLocation = null;
-let isSatelliteView = false;
-
-// Status display
-function showStatus(message, type = 'info') {
-  const toast = document.getElementById('statusToast');
-  toast.textContent = message;
-  toast.className = `status-toast ${type}`;
-  toast.style.display = 'block';
-  
-  setTimeout(() => {
-    toast.style.display = 'none';
-  }, type === 'error' ? 6000 : 3000);
-}
-
-// Loading state for inputs
-function setInputLoading(inputId, isLoading) {
-  const input = document.getElementById(inputId);
-  if (isLoading) {
-    input.classList.add('loading');
-  } else {
-    input.classList.remove('loading');
-  }
-}
-
-// Coordinate parsing and validation
-function parseLatLng(s) {
-  if (!s) return null;
-  const parts = s.split(',').map(p => p.trim());
-  if (parts.length !== 2) return null;
-  const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
-  if (Number.isFinite(lat) && Number.isFinite(lng) && 
-      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-    return [lat, lng];
-  }
-  return null;
-}
-
-function isCoordinates(input) {
-  return /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(input.trim());
-}
-
-// Direct geocoding using Nominatim (no backend dependency)
-async function geocodePlace(placeName) {
-  try {
-    console.log('Geocoding directly:', placeName);
-    showStatus('Finding location...');
-    
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1&addressdetails=1`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'EasyMap/1.0 (Educational)'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Location search failed (${response.status}). Please try coordinates instead.`);
-    }
-    
-    const results = await response.json();
-    if (!results || results.length === 0) {
-      throw new Error(`No location found for "${placeName}". Try being more specific or use coordinates (lat,lng).`);
-    }
-    
-    const result = results[0];
-    console.log('Geocoding successful:', result);
-    
-    return {
-      lat: parseFloat(result.lat),
-      lon: parseFloat(result.lon),
-      display_name: result.display_name
-    };
-  } catch (error) {
-    console.error('Geocoding error:', error);
-    throw new Error(`Location search failed for "${placeName}". ${error.message}`);
-  }
-}
-
-// Process location input with robust error handling
-async function processLocationInput(input, isFrom = true) {
-  const inputId = isFrom ? 'fromInput' : 'toInput';
-  setInputLoading(inputId, true);
-  
-  try {
-    if (!input || !input.trim()) {
-      throw new Error('Please enter a location');
-    }
-
-    let coords;
-    let displayName = input.trim();
-
-    if (isCoordinates(input)) {
-      const latLng = parseLatLng(input);
-      if (!latLng) throw new Error('Invalid coordinate format. Use: latitude,longitude (e.g., 40.7128,-74.0060)');
-      coords = { lat: latLng[0], lng: latLng[1] };
-      displayName = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-      console.log('Using coordinates:', coords);
-    } else {
-      try {
-        const geocoded = await geocodePlace(input);
-        coords = { lat: geocoded.lat, lng: geocoded.lon };
-        displayName = geocoded.display_name;
-      } catch (geocodeError) {
-        throw new Error(`${geocodeError.message} Try using coordinates like: 40.7128,-74.0060`);
-      }
-    }
-
-    // Validate coordinates
-    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
-      throw new Error('Invalid coordinates received. Please try again.');
-    }
-
-    const locationData = { coords, displayName, original: input.trim() };
-    
-    if (isFrom) {
-      currentFromLocation = locationData;
-    } else {
-      currentToLocation = locationData;
-    }
-
-    return coords;
-  } finally {
-    setInputLoading(inputId, false);
-  }
-}
-
-// Create custom markers
-function createCustomIcon(isFrom) {
-  return L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="
-      width: 30px; 
-      height: 30px; 
-      background: ${isFrom ? '#4285f4' : '#ea4335'}; 
-      border: 3px solid white; 
-      border-radius: 50%; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-    ">
-      <i class="fas ${isFrom ? 'fa-circle' : 'fa-map-marker-alt'}" style="font-size: ${isFrom ? '8px' : '14px'};"></i>
-    </div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15]
-  });
-}
-
-function setMarker(coords, isFrom = true) {
-  const marker = L.marker([coords.lat, coords.lng], {
-    draggable: true,
-    icon: createCustomIcon(isFrom)
-  });
-  
-  const location = isFrom ? currentFromLocation : currentToLocation;
-  const popupContent = `
-    <div style="min-width: 200px;">
-      <strong>${isFrom ? 'Starting Point' : 'Destination'}</strong><br>
-      <small>${location?.displayName || 'Unknown location'}</small>
-    </div>
-  `;
-  
-  if (isFrom) {
-    if (fromMarker) map.removeLayer(fromMarker);
-    fromMarker = marker.addTo(map).bindPopup(popupContent);
-    fromMarker.on('dragend', updateFromDrag);
-  } else {
-    if (toMarker) map.removeLayer(toMarker);
-    toMarker = marker.addTo(map).bindPopup(popupContent);
-    toMarker.on('dragend', updateToDrag);
-  }
-  
-  // Auto-open popup briefly
-  setTimeout(() => marker.openPopup(), 100);
-  setTimeout(() => marker.closePopup(), 2000);
-}
-
-function updateFromDrag() {
-  const pos = fromMarker.getLatLng();
-  const coordString = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-  currentFromLocation = {
-    coords: { lat: pos.lat, lng: pos.lng },
-    displayName: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
-    original: coordString
-  };
-  document.getElementById('fromInput').value = coordString;
-  showStatus('Starting point updated', 'success');
-}
-
-function updateToDrag() {
-  const pos = toMarker.getLatLng();
-  const coordString = `${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-  currentToLocation = {
-    coords: { lat: pos.lat, lng: pos.lng },
-    displayName: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
-    original: coordString
-  };
-  document.getElementById('toInput').value = coordString;
-  showStatus('Destination updated', 'success');
-}
-
-// Map click handling
-map.on('click', (e) => {
-  const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
-  const coordString = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
-  
-  if (!currentFromLocation) {
-    currentFromLocation = {
-      coords: coords,
-      displayName: coordString,
-      original: coordString
-    };
-    document.getElementById('fromInput').value = coordString;
-    setMarker(coords, true);
-    showStatus('Starting point set', 'success');
-  } else if (!currentToLocation) {
-    currentToLocation = {
-      coords: coords,
-      displayName: coordString,
-      original: coordString
-    };
-    document.getElementById('toInput').value = coordString;
-    setMarker(coords, false);
-    showStatus('Destination set', 'success');
-  } else {
-    // Replace destination with new click
-    currentToLocation = {
-      coords: coords,
-      displayName: coordString,
-      original: coordString
-    };
-    document.getElementById('toInput').value = coordString;
-    setMarker(coords, false);
-    showStatus('Destination updated', 'success');
-  }
-});
-
-// Swap locations
-document.getElementById('swapBtn').addEventListener('click', () => {
-  const fromInput = document.getElementById('fromInput');
-  const toInput = document.getElementById('toInput');
-  
-  const tempValue = fromInput.value;
-  fromInput.value = toInput.value;
-  toInput.value = tempValue;
-  
-  const tempLocation = currentFromLocation;
-  currentFromLocation = currentToLocation;
-  currentToLocation = tempLocation;
-  
-  if (currentFromLocation) setMarker(currentFromLocation.coords, true);
-  if (currentToLocation) setMarker(currentToLocation.coords, false);
-  
-  showStatus('Locations swapped', 'success');
-});
-
-// Clear all
-document.getElementById('clearBtn').addEventListener('click', () => {
-  if (fromMarker) { map.removeLayer(fromMarker); fromMarker = null; }
-  if (toMarker) { map.removeLayer(toMarker); toMarker = null; }
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
-  
-  currentFromLocation = null;
-  currentToLocation = null;
-  
-  document.getElementById('fromInput').value = '';
-  document.getElementById('toInput').value = '';
-  document.getElementById('routeInfo').style.display = 'none';
-  
-  showStatus('All cleared', 'success');
-});
-
-// Get current location
-document.getElementById('locBtn').addEventListener('click', () => {
-  if (!navigator.geolocation) {
-    showStatus('Geolocation not supported by your browser', 'error');
-    return;
-  }
-  
-  const btn = document.getElementById('locBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finding...';
-  
-  navigator.geolocation.getCurrentPosition(pos => {
-    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    const coordString = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
-    
-    currentFromLocation = {
-      coords: coords,
-      displayName: 'Your Current Location',
-      original: coordString
-    };
-    
-    document.getElementById('fromInput').value = 'Your Location';
-    map.setView([coords.lat, coords.lng], 15);
-    setMarker(coords, true);
-    
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-crosshairs"></i> My Location';
-    showStatus('Current location set as starting point', 'success');
-  }, err => {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-crosshairs"></i> My Location';
-    
-    let errorMsg = 'Location access denied';
-    if (err.code === 1) errorMsg = 'Location access denied. Please allow location access.';
-    else if (err.code === 2) errorMsg = 'Location unavailable. Please try again.';
-    else if (err.code === 3) errorMsg = 'Location request timed out. Please try again.';
-    
-    showStatus(errorMsg, 'error');
-  }, {
-    enableHighAccuracy: true,
-    timeout: 15000,
-    maximumAge: 300000
-  });
-});
-
-// Direct OSRM routing (no backend dependency)
-document.getElementById('routeBtn').addEventListener('click', async () => {
-  const fromInput = document.getElementById('fromInput').value.trim();
-  const toInput = document.getElementById('toInput').value.trim();
-  
-  if (!fromInput || !toInput) {
-    showStatus('Please enter both starting point and destination', 'error');
-    return;
-  }
-
-  const routeBtn = document.getElementById('routeBtn');
-  const originalHTML = routeBtn.innerHTML;
-  routeBtn.disabled = true;
-  routeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Finding route...';
-
-  try {
-    // Process FROM location
-    if (!currentFromLocation || currentFromLocation.original !== fromInput) {
-      try {
-        showStatus('Locating starting point...');
-        await processLocationInput(fromInput, true);
-        if (currentFromLocation?.coords) {
-          setMarker(currentFromLocation.coords, true);
+        // Initialize the map
+        function initMap() {
+            const mapOverlay = document.getElementById('mapOverlay');
+            
+            // Create street network with traffic data
+            createStreetNetwork(mapOverlay);
+            createPOIMarkers(mapOverlay);
+            
+            // Simulate real-time traffic updates
+            setInterval(updateTraffic, 5000);
         }
-      } catch (error) {
-        throw new Error(`Starting point: ${error.message}`);
-      }
-    }
-    
-    // Process TO location
-    if (!currentToLocation || currentToLocation.original !== toInput) {
-      try {
-        showStatus('Locating destination...');
-        await processLocationInput(toInput, false);
-        if (currentToLocation?.coords) {
-          setMarker(currentToLocation.coords, false);
+
+        function createStreetNetwork(container) {
+            const streets = [
+                // Horizontal streets
+                { x: 10, y: 20, width: 200, height: 4, traffic: 'light' },
+                { x: 250, y: 20, width: 150, height: 4, traffic: 'heavy' },
+                { x: 10, y: 80, width: 180, height: 4, traffic: 'medium' },
+                { x: 220, y: 80, width: 200, height: 4, traffic: 'light' },
+                { x: 50, y: 140, width: 250, height: 4, traffic: 'medium' },
+                { x: 10, y: 200, width: 300, height: 4, traffic: 'heavy' },
+                { x: 80, y: 260, width: 200, height: 4, traffic: 'light' },
+                
+                // Vertical streets
+                { x: 60, y: 10, width: 4, height: 150, traffic: 'medium' },
+                { x: 150, y: 30, width: 4, height: 180, traffic: 'light' },
+                { x: 240, y: 15, width: 4, height: 200, traffic: 'heavy' },
+                { x: 320, y: 40, width: 4, height: 160, traffic: 'medium' },
+                { x: 100, y: 120, width: 4, height: 120, traffic: 'light' },
+            ];
+
+            streets.forEach(street => {
+                const streetEl = document.createElement('div');
+                streetEl.className = `street traffic-${street.traffic}`;
+                streetEl.style.left = street.x + 'px';
+                streetEl.style.top = street.y + 'px';
+                streetEl.style.width = street.width + 'px';
+                streetEl.style.height = street.height + 'px';
+                container.appendChild(streetEl);
+            });
         }
-      } catch (error) {
-        throw new Error(`Destination: ${error.message}`);
-      }
-    }
 
-    if (!currentFromLocation?.coords || !currentToLocation?.coords) {
-      throw new Error('Could not determine coordinates. Please try using coordinates format: lat,lng');
-    }
+        function createPOIMarkers(container) {
+            const markers = [
+                { x: 100, y: 50, type: 'start', label: 'Start' },
+                { x: 300, y: 180, type: 'end', label: 'Destination' },
+                { x: 200, y: 120, type: 'poi', label: 'Restaurant' },
+                { x: 150, y: 90, type: 'poi', label: 'Gas Station' }
+            ];
 
-    showStatus('Calculating optimal route...');
-    
-    // Use direct OSRM routing
-    const startCoords = `${currentFromLocation.coords.lng},${currentFromLocation.coords.lat}`;
-    const endCoords = `${currentToLocation.coords.lng},${currentToLocation.coords.lat}`;
-    const routeUrl = `https://router.project-osrm.org/route/v1/driving/${startCoords};${endCoords}?overview=full&geometries=geojson&alternatives=false&steps=false`;
-    
-    console.log('Direct OSRM request:', routeUrl);
-    
-    const response = await fetch(routeUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Routing service error (${response.status}). Please check your internet connection.`);
-    }
-    
-    const data = await response.json();
-    console.log('OSRM response:', data);
-    
-    if (!data.routes || !data.routes.length) {
-      throw new Error('No route found between these locations. They may be too far apart or unreachable by road.');
-    }
-    
-    const route = data.routes[0];
-    
-    if (!route.geometry) {
-      throw new Error('Invalid route data received');
-    }
-    
-    // Remove existing route and add new one
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.geoJSON(route.geometry, { 
-      style: { 
-        color: '#1a73e8', 
-        weight: 6, 
-        opacity: 0.8,
-        lineJoin: 'round',
-        lineCap: 'round'
-      } 
-    }).addTo(map);
-    
-    // Fit map to show entire route
-    map.fitBounds(routeLayer.getBounds().pad(0.1));
-    
-    // Update info display
-    const distanceKm = (route.distance / 1000).toFixed(1);
-    const durationMins = Math.round(route.duration / 60);
-    const durationHours = durationMins >= 60 ? 
-      `${Math.floor(durationMins/60)}h ${durationMins%60}m` : 
-      `${durationMins} min`;
-    
-    document.getElementById('distance').textContent = `${distanceKm} km`;
-    document.getElementById('duration').textContent = durationHours;
-    
-    const fromName = currentFromLocation.displayName.split(',')[0].substring(0, 25);
-    const toName = currentToLocation.displayName.split(',')[0].substring(0, 25);
-    document.getElementById('routeDetails').textContent = `${fromName}... → ${toName}...`;
-    
-    // Show route info panel
-    document.getElementById('routeInfo').style.display = 'block';
-    
-    showStatus(`✓ Route found! ${distanceKm} km in ${durationHours}`, 'success');
-    
-  } catch (error) {
-    console.error('Routing error:', error);
-    showStatus(error.message, 'error');
-    document.getElementById('routeInfo').style.display = 'none';
-  } finally {
-    routeBtn.disabled = false;
-    routeBtn.innerHTML = originalHTML;
-  }
-});
+            markers.forEach(marker => {
+                const markerEl = document.createElement('div');
+                markerEl.className = `marker ${marker.type}`;
+                markerEl.style.left = (marker.x - 15) + 'px';
+                markerEl.style.top = (marker.y - 15) + 'px';
+                markerEl.title = marker.label;
+                markerEl.onclick = () => showMarkerInfo(marker);
+                container.appendChild(markerEl);
+            });
 
-// Export route (since backend save might not work)
-document.getElementById('saveBtn').addEventListener('click', () => {
-  if (!routeLayer) {
-    showStatus('No route to export. Generate a route first.', 'error');
-    return;
-  }
-  
-  try {
-    const routeData = {
-      from: currentFromLocation,
-      to: currentToLocation,
-      route: routeLayer.toGeoJSON(),
-      timestamp: new Date().toISOString(),
-      distance: document.getElementById('distance').textContent,
-      duration: document.getElementById('duration').textContent
-    };
-    
-    const dataStr = JSON.stringify(routeData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `route_${Date.now()}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    showStatus('Route exported successfully!', 'success');
-  } catch (error) {
-    showStatus('Export failed: ' + error.message, 'error');
-  }
-});
-
-// Map controls
-document.getElementById('centerBtn').addEventListener('click', () => {
-  if (routeLayer) {
-    map.fitBounds(routeLayer.getBounds().pad(0.1));
-    showStatus('Centered on route');
-  } else if (fromMarker && toMarker) {
-    const group = new L.featureGroup([fromMarker, toMarker]);
-    map.fitBounds(group.getBounds().pad(0.2));
-    showStatus('Centered on markers');
-  } else {
-    showStatus('No route or markers to center on', 'error');
-  }
-});
-
-document.getElementById('satelliteBtn').addEventListener('click', () => {
-  const btn = document.getElementById('satelliteBtn');
-  
-  if (isSatelliteView) {
-    map.removeLayer(satelliteLayer);
-    currentTileLayer.addTo(map);
-    btn.innerHTML = '<i class="fas fa-satellite"></i>';
-    btn.title = 'Satellite view';
-    isSatelliteView = false;
-    showStatus('Map view enabled');
-  } else {
-    map.removeLayer(currentTileLayer);
-    satelliteLayer.addTo(map);
-    btn.innerHTML = '<i class="fas fa-map"></i>';
-    btn.title = 'Map view';
-    isSatelliteView = true;
-    showStatus('Satellite view enabled');
-  }
-});
-
-document.getElementById('fullscreenBtn').addEventListener('click', () => {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
-    showStatus('Fullscreen enabled');
-  } else {
-    document.exitFullscreen();
-    showStatus('Fullscreen disabled');
-  }
-});
-
-// Auto-processing with debounce
-let fromTimeout, toTimeout;
-
-document.getElementById('fromInput').addEventListener('input', (e) => {
-  clearTimeout(fromTimeout);
-  const value = e.target.value.trim();
-  
-  if (!value) {
-    if (currentFromLocation) {
-      currentFromLocation = null;
-      if (fromMarker) {
-        map.removeLayer(fromMarker);
-        fromMarker = null;
-      }
-    }
-    return;
-  }
-  
-  fromTimeout = setTimeout(async () => {
-    if (value && (!currentFromLocation || currentFromLocation.original !== value)) {
-      try {
-        await processLocationInput(value, true);
-        if (currentFromLocation?.coords) {
-          setMarker(currentFromLocation.coords, true);
-          showStatus(`✓ Starting point: ${currentFromLocation.displayName.split(',')[0]}`, 'success');
+            // Create route line
+            if (features.street) {
+                createRouteLine(container);
+            }
         }
-      } catch (error) {
-        console.log('Auto-processing error:', error.message);
-      }
-    }
-  }, 2500);
-});
 
-document.getElementById('toInput').addEventListener('input', (e) => {
-  clearTimeout(toTimeout);
-  const value = e.target.value.trim();
-  
-  if (!value) {
-    if (currentToLocation) {
-      currentToLocation = null;
-      if (toMarker) {
-        map.removeLayer(toMarker);
-        toMarker = null;
-      }
-    }
-    return;
-  }
-  
-  toTimeout = setTimeout(async () => {
-    if (value && (!currentToLocation || currentToLocation.original !== value)) {
-      try {
-        await processLocationInput(value, false);
-        if (currentToLocation?.coords) {
-          setMarker(currentToLocation.coords, false);
-          showStatus(`✓ Destination: ${currentToLocation.displayName.split(',')[0]}`, 'success');
+        function createRouteLine(container) {
+            const routeSegments = [
+                { x: 115, y: 52, width: 140, height: 4, rotation: 0 },
+                { x: 240, y: 52, width: 4, height: 28, rotation: 90 },
+                { x: 242, y: 78, width: 60, height: 4, rotation: 0 },
+                { x: 300, y: 80, width: 4, height: 100, rotation: 90 }
+            ];
+
+            routeSegments.forEach(segment => {
+                const routeEl = document.createElement('div');
+                routeEl.className = 'route-line';
+                routeEl.style.left = segment.x + 'px';
+                routeEl.style.top = segment.y + 'px';
+                routeEl.style.width = segment.width + 'px';
+                routeEl.style.height = segment.height + 'px';
+                if (segment.rotation) {
+                    routeEl.style.transform = `rotate(${segment.rotation}deg)`;
+                }
+                container.appendChild(routeEl);
+            });
         }
-      } catch (error) {
-        console.log('Auto-processing error:', error.message);
-      }
-    }
-  }, 2500);
-});
 
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.target.id === 'fromInput' || e.target.id === 'toInput')) {
-    e.preventDefault();
-    document.getElementById('routeBtn').click();
-  }
-  
-  if (e.key === 'Escape') {
-    document.getElementById('clearBtn').click();
-  }
-});
+        function updateTraffic() {
+            if (!features.traffic) return;
+            
+            const streets = document.querySelectorAll('.street');
+            streets.forEach(street => {
+                const currentClass = street.className;
+                const trafficTypes = ['light', 'medium', 'heavy'];
+                const randomTraffic = trafficTypes[Math.floor(Math.random() * trafficTypes.length)];
+                
+                // 20% chance to change traffic
+                if (Math.random() < 0.2) {
+                    street.className = `street traffic-${randomTraffic}`;
+                }
+            });
+        }
 
-// Mobile sidebar toggle
-document.getElementById('sidebar').addEventListener('click', (e) => {
-  if (window.innerWidth <= 768 && e.target === document.getElementById('sidebar')) {
-    document.getElementById('sidebar').classList.toggle('expanded');
-  }
-});
+        function selectTransport(mode) {
+            currentTransportMode = mode;
+            document.querySelectorAll('.transport-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+            
+            // Update route visualization based on transport mode
+            updateRouteForMode(mode);
+        }
 
-// Initialize app
-function initializeApp() {
-  // Set focus to first input
-  document.getElementById('fromInput').focus();
-  
-  // Show initial help
-  setTimeout(() => {
-    if (!document.getElementById('fromInput').value) {
-      showStatus('💡 Enter locations, use your location, or click on the map to start', 'info');
-    }
-  }, 1500);
-  
-  // Set connection indicator
-  const indicator = document.getElementById('connectionIndicator');
-  indicator.textContent = '● Direct Mode';
-  indicator.className = 'connection-indicator online';
-  indicator.style.display = 'block';
-  
-  console.log('EasyMap initialized in direct mode (no backend dependency)');
-}
+        function updateRouteForMode(mode) {
+            const routeLines = document.querySelectorAll('.route-line');
+            routeLines.forEach(line => {
+                switch(mode) {
+                    case 'car':
+                        line.style.background = '#2196F3';
+                        line.style.height = '4px';
+                        break;
+                    case 'bike':
+                        line.style.background = '#FF9800';
+                        line.style.height = '3px';
+                        break;
+                    case 'walk':
+                        line.style.background = '#4CAF50';
+                        line.style.height = '2px';
+                        break;
+                }
+            });
+        }
 
-// Start the app
-initializeApp();
+        function toggleFeature(toggle) {
+            const feature = toggle.dataset.feature;
+            features[feature] = !features[feature];
+            toggle.classList.toggle('active');
+            
+            // Apply feature changes
+            applyFeatureChanges(feature, features[feature]);
+        }
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-  .custom-marker {
-    animation: markerDrop 0.5s ease-out;
-  }
-  
-  @keyframes markerDrop {
-    0% { transform: translateY(-20px); opacity: 0; }
-    100% { transform: translateY(0); opacity: 1; }
-  }
-  
-  .leaflet-control-container .leaflet-control-zoom {
-    border: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  }
-  
-  .leaflet-control-zoom a {
-    width: 45px;
-    height: 45px;
-    line-height: 43px;
-    font-size: 18px;
-    border-radius: 8px;
-    margin: 2px;
-    background: white;
-    color: #666;
-  }
-  
-  .leaflet-control-zoom a:hover {
-    background: #f8f9fa;
-  }
-`;
-document.head.appendChild(style);
+        function applyFeatureChanges(feature, enabled) {
+            const mapContainer = document.querySelector('.map');
+            
+            switch(feature) {
+                case 'traffic':
+                    const streets = document.querySelectorAll('.street');
+                    streets.forEach(street => {
+                        if (enabled) {
+                            street.style.display = 'block';
+                        } else {
+                            street.style.background = 'rgba(255,255,255,0.8)';
+                            street.classList.remove('traffic-heavy', 'traffic-medium', 'traffic-light');
+                        }
+                    });
+                    break;
+                    
+                case 'satellite':
+                    if (enabled) {
+                        mapContainer.style.background = 'url("data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cdefs%3E%3Cpattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"%3E%3Cpath d="M 10 0 L 0 0 0 10" fill="none" stroke="%23333" stroke-width="0.5"/%3E%3C/pattern%3E%3C/defs%3E%3Crect width="100" height="100" fill="%234a5568"/%3E%3Crect width="100" height="100" fill="url(%23grid)"/%3E%3C/svg%3E")';
+                    } else {
+                        mapContainer.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    }
+                    break;
+                    
+                case 'voice':
+                    if (enabled && isNavigating) {
+                        showNotification('Voice guidance enabled');
+                    }
+                    break;
+            }
+        }
 
-</script>
+        function search() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value.trim();
+            
+            if (query) {
+                showNotification(`Searching for "${query}"...`);
+                
+                // Simulate search results
+                setTimeout(() => {
+                    document.getElementById('toInput').value = query;
+                    showNotification(`Found: ${query}`);
+                }, 1000);
+            }
+        }
+
+        function startNavigation() {
+            const fromInput = document.getElementById('fromInput').value;
+            const toInput = document.getElementById('toInput').value;
+            
+            if (!toInput.trim()) {
+                showNotification('Please enter a destination');
+                return;
+            }
+            
+            isNavigating = !isNavigating;
+            const navPanel = document.getElementById('navigationPanel');
+            
+            if (isNavigating) {
+                navPanel.classList.add('active');
+                showNotification('Navigation started');
+                
+                // Simulate navigation instructions
+                const instructions = [
+                    { instruction: 'Head north on Main Street', distance: 'for 200 meters' },
+                    { instruction: 'Turn right onto Oak Avenue', distance: 'in 500 meters' },
+                    { instruction: 'Continue straight', distance: 'for 1.2 km' },
+                    { instruction: 'Turn left onto Park Road', distance: 'in 300 meters' },
+                    { instruction: 'Destination on your right', distance: 'in 100 meters' }
+                ];
+                
+                let currentInstruction = 0;
+                navigationInterval = setInterval(() => {
+                    if (currentInstruction < instructions.length) {
+                        document.getElementById('navInstruction').textContent = instructions[currentInstruction].instruction;
+                        document.getElementById('navDistance').textContent = instructions[currentInstruction].distance;
+                        currentInstruction++;
+                        
+                        if (features.voice) {
+                            // Simulate voice guidance
+                            showNotification('🔊 ' + instructions[currentInstruction - 1].instruction);
+                        }
+                    } else {
+                        clearInterval(navigationInterval);
+                        showNotification('You have arrived at your destination!');
+                        stopNavigation();
+                    }
+                }, 3000);
+            } else {
+                stopNavigation();
+            }
+        }
+
+        function stopNavigation() {
+            isNavigating = false;
+            clearInterval(navigationInterval);
+            document.getElementById('navigationPanel').classList.remove('active');
+            showNotification('Navigation stopped');
+        }
+
+        function zoomIn() {
+            zoomLevel = Math.min(zoomLevel + 0.2, 3);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.5);
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const mapOverlay = document.getElementById('mapOverlay');
+            mapOverlay.style.transform = `scale(${zoomLevel})`;
+            mapOverlay.style.transformOrigin = 'center center';
+        }
+
+        function centerLocation() {
+            showNotification('Centered on your location');
+            // Reset zoom and position
+            zoomLevel = 1;
+            applyZoom();
+        }
+
+        function showMarkerInfo(marker) {
+            showNotification(`📍 ${marker.label}`);
+        }
+
+        function showNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #333;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 25px;
+                z-index: 10000;
+                font-size: 14px;
+                box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+                animation: slideInDown 0.3s ease;
+            `;
+            notification.textContent = message;
+            
+            // Add animation keyframes if not exists
+            if (!document.querySelector('#notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideInDown {
+                        from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+                        to { transform: translateX(-50%) translateY(0); opacity: 1; }
+                    }
+                    @keyframes slideOutUp {
+                        from { transform: translateX(-50%) translateY(0); opacity: 1; }
+                        to { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOutUp 0.3s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        // Route calculation and display
+        function calculateRoute() {
+            const fromInput = document.getElementById('fromInput').value;
+            const toInput = document.getElementById('toInput').value;
+            
+            if (!fromInput.trim() || !toInput.trim()) {
+                showNotification('Please enter both start and destination locations');
+                return;
+            }
+            
+            showNotification('Calculating best route...');
+            
+            // Simulate route calculation
+            setTimeout(() => {
+                const routeInfo = {
+                    distance: '5.2 km',
+                    duration: currentTransportMode === 'car' ? '12 min' : 
+                             currentTransportMode === 'bike' ? '18 min' : '45 min',
+                    traffic: 'Light traffic on route'
+                };
+                
+                displayRouteInfo(routeInfo);
+                updateRouteVisualization();
+            }, 2000);
+        }
+
+        function displayRouteInfo(routeInfo) {
+            const routeDisplay = document.createElement('div');
+            routeDisplay.style.cssText = `
+                position: absolute;
+                bottom: 100px;
+                right: 30px;
+                background: white;
+                padding: 20px;
+                border-radius: 15px;
+                box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+                z-index: 1000;
+                min-width: 200px;
+            `;
+            
+            routeDisplay.innerHTML = `
+                <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">Route Information</h3>
+                <p style="margin: 5px 0; color: #666; font-size: 14px;">📏 Distance: ${routeInfo.distance}</p>
+                <p style="margin: 5px 0; color: #666; font-size: 14px;">⏱️ Duration: ${routeInfo.duration}</p>
+                <p style="margin: 5px 0; color: #666; font-size: 14px;">🚦 ${routeInfo.traffic}</p>
+                <button onclick="this.parentNode.remove()" style="
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: none;
+                    border: none;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: #999;
+                ">×</button>
+            `;
+            
+            // Remove existing route info
+            const existing = document.querySelector('.route-info');
+            if (existing) existing.remove();
+            
+            routeDisplay.className = 'route-info';
+            document.querySelector('.map-container').appendChild(routeDisplay);
+        }
+
+        function updateRouteVisualization() {
+            // Remove existing route
+            document.querySelectorAll('.route-line').forEach(el => el.remove());
+            
+            // Create new route based on current settings
+            const mapOverlay = document.getElementById('mapOverlay');
+            createRouteLine(mapOverlay);
+        }
+
+        // Real-time location simulation
+        function simulateLocationUpdates() {
+            if (!isNavigating) return;
+            
+            // Simulate GPS updates every 2 seconds
+            setInterval(() => {
+                if (isNavigating) {
+                    const currentLocationMarker = document.querySelector('.marker.start');
+                    if (currentLocationMarker) {
+                        // Simulate movement along route
+                        const currentX = parseInt(currentLocationMarker.style.left);
+                        const currentY = parseInt(currentLocationMarker.style.top);
+                        
+                        // Move marker slightly along route
+                        currentLocationMarker.style.left = (currentX + Math.random() * 4 - 2) + 'px';
+                        currentLocationMarker.style.top = (currentY + Math.random() * 4 - 2) + 'px';
+                    }
+                }
+            }, 2000);
+        }
+
+        // Traffic incidents simulation
+        function generateTrafficIncidents() {
+            const incidents = [
+                'Road construction on Oak Avenue',
+                'Accident reported on Main Street',
+                'Heavy traffic due to event',
+                'Lane closure on Highway 101',
+                'Traffic signal malfunction'
+            ];
+            
+            setInterval(() => {
+                if (features.alerts && Math.random() < 0.3) {
+                    const randomIncident = incidents[Math.floor(Math.random() * incidents.length)];
+                    showNotification('🚨 ' + randomIncident);
+                }
+            }, 15000);
+        }
+
+        // Weather integration simulation
+        function updateWeatherConditions() {
+            const weatherConditions = [
+                { condition: 'Clear', icon: '☀️', impact: 'Normal driving conditions' },
+                { condition: 'Rain', icon: '🌧️', impact: 'Reduced visibility, drive carefully' },
+                { condition: 'Snow', icon: '❄️', impact: 'Icy roads, increased travel time' },
+                { condition: 'Fog', icon: '🌫️', impact: 'Poor visibility conditions' }
+            ];
+            
+            const randomWeather = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+            
+            // Create weather widget
+            let weatherWidget = document.querySelector('.weather-widget');
+            if (!weatherWidget) {
+                weatherWidget = document.createElement('div');
+                weatherWidget.className = 'weather-widget';
+                weatherWidget.style.cssText = `
+                    position: absolute;
+                    top: 100px;
+                    right: 20px;
+                    background: rgba(255,255,255,0.95);
+                    padding: 15px;
+                    border-radius: 10px;
+                    box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+                    z-index: 1000;
+                    font-size: 14px;
+                    backdrop-filter: blur(10px);
+                `;
+                document.querySelector('.map-container').appendChild(weatherWidget);
+            }
+            
+            weatherWidget.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">${randomWeather.icon}</span>
+                    <div>
+                        <div style="font-weight: bold; color: #333;">${randomWeather.condition}</div>
+                        <div style="color: #666; font-size: 12px;">${randomWeather.impact}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Points of Interest management
+        function addPOI(type, x, y, label) {
+            const mapOverlay = document.getElementById('mapOverlay');
+            const poi = document.createElement('div');
+            
+            const poiIcons = {
+                restaurant: '🍽️',
+                gas: '⛽',
+                hotel: '🏨',
+                hospital: '🏥',
+                shop: '🛍️',
+                park: '🌳'
+            };
+            
+            poi.style.cssText = `
+                position: absolute;
+                left: ${x}px;
+                top: ${y}px;
+                width: 25px;
+                height: 25px;
+                background: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                cursor: pointer;
+                z-index: 150;
+                transition: all 0.3s ease;
+            `;
+            
+            poi.innerHTML = poiIcons[type] || '📍';
+            poi.title = label;
+            poi.onclick = () => showPOIDetails(type, label, x, y);
+            
+            poi.addEventListener('mouseenter', () => {
+                poi.style.transform = 'scale(1.2)';
+                poi.style.zIndex = '200';
+            });
+            
+            poi.addEventListener('mouseleave', () => {
+                poi.style.transform = 'scale(1)';
+                poi.style.zIndex = '150';
+            });
+            
+            mapOverlay.appendChild(poi);
+        }
+
+        function showPOIDetails(type, label, x, y) {
+            const details = document.createElement('div');
+            details.style.cssText = `
+                position: absolute;
+                left: ${x + 30}px;
+                top: ${y - 20}px;
+                background: white;
+                padding: 15px;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 1000;
+                min-width: 200px;
+                max-width: 300px;
+            `;
+            
+            const poiInfo = {
+                restaurant: { rating: '4.5⭐', hours: 'Open until 10 PM', phone: '+1 234-567-8900' },
+                gas: { price: '$3.45/gal', hours: '24/7', services: 'Car wash available' },
+                hotel: { rating: '4.2⭐', price: '$120/night', amenities: 'Pool, WiFi, Parking' }
+            };
+            
+            const info = poiInfo[type] || { rating: '4.0⭐', hours: 'Open now' };
+            
+            details.innerHTML = `
+                <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 16px;">${label}</div>
+                ${Object.entries(info).map(([key, value]) => 
+                    `<div style="margin: 5px 0; color: #666; font-size: 14px;">${key}: ${value}</div>`
+                ).join('')}
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button onclick="addToRoute('${label}')" style="
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        padding: 8px 15px;
+                        border-radius: 20px;
+                        cursor: pointer;
+                        font-size: 12px;
+                    ">Add to Route</button>
+                    <button onclick="this.parentNode.parentNode.remove()" style="
+                        background: #f44336;
+                        color: white;
+                        border: none;
+                        padding: 8px 15px;
+                        border-radius: 20px;
+                        cursor: pointer;
+                        font-size: 12px;
+                    ">Close</button>
+                </div>
+            `;
+            
+            // Remove existing POI details
+            document.querySelectorAll('.poi-details').forEach(el => el.remove());
+            details.className = 'poi-details';
+            
+            document.getElementById('mapOverlay').appendChild(details);
+        }
+
+        function addToRoute(poiLabel) {
+            document.getElementById('toInput').value = poiLabel;
+            showNotification(`Added ${poiLabel} to route`);
+            document.querySelectorAll('.poi-details').forEach(el => el.remove());
+        }
+
+        // Initialize everything when page loads
+        window.addEventListener('load', () => {
+            initMap();
+            simulateLocationUpdates();
+            generateTrafficIncidents();
+            updateWeatherConditions();
+            
+            // Add some sample POIs
+            addPOI('restaurant', 180, 95, 'Pizza Palace');
+            addPOI('gas', 280, 45, 'Shell Station');
+            addPOI('hotel', 340, 160, 'Grand Hotel');
+            addPOI('hospital', 120, 180, 'City Hospital');
+            
+            // Update weather every 30 seconds
+            setInterval(updateWeatherConditions, 30000);
+            
+            // Auto-calculate route when inputs change
+            document.getElementById('toInput').addEventListener('input', () => {
+                if (document.getElementById('toInput').value.trim()) {
+                    setTimeout(calculateRoute, 1000);
+                }
+            });
+            
+            // Enter key support for search
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    search();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
