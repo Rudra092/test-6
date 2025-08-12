@@ -1,1255 +1,268 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Maps Clone</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-            height: 100vh;
-            overflow: hidden;
-            background: #ffffff;
-        }
-
-        .app-container {
-            display: flex;
-            height: 100vh;
-            position: relative;
-        }
-
-        .sidebar {
-            width: 400px;
-            background: #ffffff;
-            border-right: 1px solid #e0e0e0;
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .header {
-            padding: 16px;
-            background: #ffffff;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .search-container {
-            position: relative;
-            margin-bottom: 16px;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #dadce0;
-            border-radius: 8px;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.2s;
-        }
-
-        .search-input:focus {
-            border-color: #1a73e8;
-            box-shadow: 0 1px 6px rgba(32,33,36,.28);
-        }
-
-        .directions-panel {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .directions-inputs {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .direction-input-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .direction-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .start-dot {
-            background: #34a853;
-        }
-
-        .end-dot {
-            background: #ea4335;
-        }
-
-        .direction-input {
-            flex: 1;
-            padding: 10px 12px;
-            border: 1px solid #dadce0;
-            border-radius: 4px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .direction-input:focus {
-            border-color: #1a73e8;
-        }
-
-        .transport-modes {
-            display: flex;
-            gap: 8px;
-            margin: 16px 0;
-            justify-content: space-around;
-        }
-
-        .transport-btn {
-            flex: 1;
-            padding: 12px 8px;
-            border: 2px solid #dadce0;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            font-size: 12px;
-            color: #3c4043;
-        }
-
-        .transport-btn.active {
-            border-color: #1a73e8;
-            background: #e8f0fe;
-            color: #1a73e8;
-        }
-
-        .transport-btn:hover {
-            background: #f8f9fa;
-        }
-
-        .transport-icon {
-            font-size: 20px;
-        }
-
-        .route-info {
-            background: white;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            border: 1px solid #e0e0e0;
-        }
-
-        .route-summary {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .route-time {
-            font-size: 24px;
-            font-weight: 500;
-            color: #1a73e8;
-        }
-
-        .route-distance {
-            font-size: 14px;
-            color: #5f6368;
-        }
-
-        .route-details {
-            font-size: 12px;
-            color: #5f6368;
-            margin-top: 8px;
-        }
-
-        .start-button {
-            width: 100%;
-            padding: 12px;
-            background: #1a73e8;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .start-button:hover {
-            background: #1557b0;
-        }
-
-        .map-container {
-            flex: 1;
-            position: relative;
-        }
-
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
-        .map-controls {
-            position: absolute;
-            bottom: 24px;
-            right: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 1000;
-        }
-
-        .control-btn {
-            width: 40px;
-            height: 40px;
-            background: white;
-            border: none;
-            border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: all 0.2s;
-        }
-
-        .control-btn:hover {
-            background: #f8f9fa;
-        }
-
-        .layers-panel {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-            overflow: hidden;
-        }
-
-        .layer-option {
-            padding: 12px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #e0e0e0;
-            transition: all 0.2s;
-            font-size: 14px;
-        }
-
-        .layer-option:last-child {
-            border-bottom: none;
-        }
-
-        .layer-option:hover {
-            background: #f8f9fa;
-        }
-
-        .layer-option.active {
-            background: #e8f0fe;
-            color: #1a73e8;
-        }
-
-        .traffic-toggle {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            background: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            z-index: 1000;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-
-        .traffic-toggle:hover {
-            background: #f8f9fa;
-        }
-
-        .traffic-toggle.active {
-            background: #1a73e8;
-            color: white;
-        }
-
-        .navigation-panel {
-            position: absolute;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 16px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-            z-index: 1000;
-            min-width: 300px;
-            display: none;
-        }
-
-        .navigation-panel.active {
-            display: block;
-            animation: slideDown 0.3s ease;
-        }
-
-        @keyframes slideDown {
-            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
-            to { transform: translateX(-50%) translateY(0); opacity: 1; }
-        }
-
-        .nav-instruction {
-            font-size: 18px;
-            font-weight: 500;
-            color: #202124;
-            margin-bottom: 4px;
-        }
-
-        .nav-distance {
-            font-size: 14px;
-            color: #5f6368;
-        }
-
-        .mobile-toggle {
-            display: none;
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            z-index: 2000;
-            background: white;
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            font-size: 20px;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .search-results {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .search-result-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-            transition: all 0.2s;
-        }
-
-        .search-result-item:hover {
-            background: #f8f9fa;
-        }
-
-        .search-result-item:last-child {
-            border-bottom: none;
-        }
-
-        .search-result-title {
-            font-weight: 500;
-            color: #202124;
-            margin-bottom: 2px;
-        }
-
-        .search-result-address {
-            font-size: 12px;
-            color: #5f6368;
-        }
-
-        .custom-popup {
-            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
-        }
-
-        .custom-popup .popup-title {
-            font-weight: 500;
-            color: #202124;
-            margin-bottom: 4px;
-        }
-
-        .custom-popup .popup-address {
-            color: #5f6368;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-
-        .custom-popup .popup-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .custom-popup .popup-btn {
-            padding: 6px 12px;
-            border: 1px solid #dadce0;
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s;
-        }
-
-        .custom-popup .popup-btn:hover {
-            background: #f8f9fa;
-        }
-
-        .custom-popup .popup-btn.primary {
-            background: #1a73e8;
-            color: white;
-            border-color: #1a73e8;
-        }
-
-        .custom-popup .popup-btn.primary:hover {
-            background: #1557b0;
-        }
-
-        .street-view-control {
-            position: absolute;
-            bottom: 80px;
-            right: 24px;
-            background: white;
-            border: none;
-            border-radius: 4px;
-            width: 40px;
-            height: 40px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            font-size: 16px;
-            z-index: 1000;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                height: 100vh;
-                z-index: 2000;
-                transform: translateX(-100%);
-            }
-
-            .sidebar.open {
-                transform: translateX(0);
-            }
-
-            .mobile-toggle {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .map-container {
-                width: 100%;
-            }
-
-            .layers-panel, .traffic-toggle {
-                display: none;
-            }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Leaflet Map — Google-Maps-like Frontend (HTML)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+e2qFZk6k2v9g3w4u3jVdGqz0m6v1kYfM2q6bU9+M=" crossorigin="" />
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Leaflet Draw -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <!-- Leaflet Routing Machine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.16/dist/leaflet-routing-machine.css" />
+
+  <style>
+    :root{--accent:#1a73e8}
+    html,body,#map{height:100%;margin:0;padding:0}
+    body{font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;color:#222}
+    #map{position:fixed;inset:0}
+
+    /* Top controls */
+    .topbar{position:fixed;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:center;z-index:1000}
+    .search-box{display:flex;flex:1;gap:8px;background:rgba(255,255,255,0.95);padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.12)}
+    .search-box input{flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+    .btn{background:var(--accent);color:white;padding:8px 10px;border-radius:6px;border:none;cursor:pointer}
+    .btn.secondary{background:#fff;color:#333;border:1px solid #ddd}
+
+    /* Sidebar */
+    .sidebar{position:fixed;right:12px;top:72px;width:320px;max-height:70vh;overflow:auto;background:rgba(255,255,255,0.98);border-radius:8px;padding:12px;box-shadow:0 6px 18px rgba(0,0,0,0.12);z-index:1000}
+    .sidebar h3{margin:4px 0 8px}
+    .place-item{padding:8px;border-bottom:1px solid #f0f0f0}
+    .small{font-size:12px;color:#666}
+
+    /* Mobile adjustments */
+    @media (max-width:720px){
+      .sidebar{right:8px;left:8px;width:auto;top:72px}
+      .topbar{left:8px;right:8px}
+    }
+
+    /* Search suggestions */
+    .suggestions{position:absolute;background:#fff;border:1px solid #e6e6e6;border-radius:6px;padding:6px;margin-top:6px;max-height:260px;overflow:auto;width:100%}
+    .suggestions button{display:block;width:100%;text-align:left;padding:8px;border-radius:6px;border:none;background:transparent}
+    .suggestions button:hover{background:#f5f8ff}
+
+    /* Small helpers */
+    .muted{color:#666;font-size:13px}
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
-        
-        <div class="sidebar" id="sidebar">
-            <div class="header">
-                <div class="search-container">
-                    <input type="text" class="search-input" placeholder="Search Google Maps" id="searchInput">
-                    <div class="search-results" id="searchResults" style="display: none;"></div>
-                </div>
-                
-                <div class="directions-panel">
-                    <div class="directions-inputs">
-                        <div class="direction-input-container">
-                            <div class="direction-dot start-dot"></div>
-                            <input type="text" class="direction-input" placeholder="Choose starting point" id="startInput">
-                        </div>
-                        <div class="direction-input-container">
-                            <div class="direction-dot end-dot"></div>
-                            <input type="text" class="direction-input" placeholder="Choose destination" id="endInput">
-                        </div>
-                    </div>
-                    
-                    <div class="transport-modes">
-                        <button class="transport-btn active" data-mode="driving" onclick="selectTransport(this, 'driving')">
-                            <div class="transport-icon">🚗</div>
-                            <div>Driving</div>
-                        </button>
-                        <button class="transport-btn" data-mode="transit" onclick="selectTransport(this, 'transit')">
-                            <div class="transport-icon">🚌</div>
-                            <div>Transit</div>
-                        </button>
-                        <button class="transport-btn" data-mode="walking" onclick="selectTransport(this, 'walking')">
-                            <div class="transport-icon">🚶</div>
-                            <div>Walking</div>
-                        </button>
-                        <button class="transport-btn" data-mode="bicycling" onclick="selectTransport(this, 'bicycling')">
-                            <div class="transport-icon">🚴</div>
-                            <div>Cycling</div>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="route-info" id="routeInfo" style="display: none;">
-                    <div class="route-summary">
-                        <div class="route-time" id="routeTime">15 min</div>
-                        <div class="route-distance" id="routeDistance">5.2 km</div>
-                    </div>
-                    <div class="route-details" id="routeDetails">Fastest route now due to traffic conditions</div>
-                    <button class="start-button" onclick="startNavigation()">Start</button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="map-container">
-            <div id="map"></div>
-            
-            <div class="traffic-toggle" onclick="toggleTraffic()" id="trafficToggle">
-                🚦 Traffic
-            </div>
-            
-            <div class="layers-panel">
-                <div class="layer-option active" onclick="switchLayer('default', this)">Default</div>
-                <div class="layer-option" onclick="switchLayer('satellite', this)">Satellite</div>
-                <div class="layer-option" onclick="switchLayer('terrain', this)">Terrain</div>
-            </div>
-            
-            <button class="street-view-control" onclick="toggleStreetView()" title="Street View">👁️</button>
-            
-            <div class="map-controls">
-                <button class="control-btn" onclick="zoomIn()" title="Zoom in">+</button>
-                <button class="control-btn" onclick="zoomOut()" title="Zoom out">−</button>
-                <button class="control-btn" onclick="centerOnUser()" title="Your location">📍</button>
-            </div>
-            
-            <div class="navigation-panel" id="navigationPanel">
-                <div class="nav-instruction" id="navInstruction">Head north on Main St</div>
-                <div class="nav-distance" id="navDistance">Continue for 0.5 km</div>
-            </div>
-        </div>
+
+  <div id="map"></div>
+
+  <div class="topbar">
+    <div class="search-box" style="position:relative;">
+      <input id="search" placeholder="Search places or addresses (type & press Enter)..." autocomplete="off" />
+      <button id="btn-geolocate" class="btn secondary" title="Go to my location">📍</button>
+      <button id="btn-route" class="btn" title="Start routing">Route</button>
+      <div id="suggestions" class="suggestions" style="display:none"></div>
     </div>
+    <button id="btn-layer" class="btn secondary">Layers</button>
+    <button id="btn-saveview" class="btn secondary">Share View</button>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script>
-        let map;
-        let currentLayer = 'default';
-        let showTraffic = false;
-        let isNavigating = false;
-        let routeLayer = null;
-        let startMarker = null;
-        let endMarker = null;
-        let userLocationMarker = null;
-        let currentTransportMode = 'driving';
-        let navigationInterval = null;
+  <div class="sidebar" id="sidebar">
+    <h3>Places & Favorites</h3>
+    <div id="placesList"><div class="small muted">No places yet — search and click results to add.</div></div>
+    <hr />
+    <h3>Routing</h3>
+    <div class="small muted">Click two points on map (or use 'Route' then click) to get directions.</div>
+    <div id="routeInstructions"></div>
+  </div>
 
-        // Sample locations for demo
-        const sampleLocations = [
-            { name: 'Times Square, New York', coords: [40.7580, -73.9855], address: 'Manhattan, NY 10036, USA' },
-            { name: 'Central Park', coords: [40.7829, -73.9654], address: 'New York, NY, USA' },
-            { name: 'Statue of Liberty', coords: [40.6892, -74.0445], address: 'New York, NY 10004, USA' },
-            { name: 'Brooklyn Bridge', coords: [40.7061, -73.9969], address: 'New York, NY, USA' },
-            { name: 'Empire State Building', coords: [40.7484, -73.9857], address: '350 5th Ave, New York, NY 10118, USA' },
-            { name: 'Golden Gate Bridge', coords: [37.8199, -122.4783], address: 'San Francisco, CA, USA' },
-            { name: 'Hollywood Sign', coords: [34.1341, -118.3215], address: 'Los Angeles, CA 90068, USA' },
-            { name: 'Space Needle', coords: [47.6205, -122.3493], address: 'Seattle, WA 98109, USA' }
-        ];
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7gG3bqJ2GQKJ4zBq1bXk1t0c8sKkWv+3yDkP4o=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.16/dist/leaflet-routing-machine.js"></script>
 
-        function initMap() {
-            // Initialize map centered on New York
-            map = L.map('map').setView([40.7589, -73.9851], 13);
-            
-            // Add default tile layer (OpenStreetMap)
-            addTileLayer('default');
-            
-            // Add click handler for map
-            map.on('click', onMapClick);
-            
-            // Get user location
-            getUserLocation();
-            
-            // Add some sample markers
-            addSampleMarkers();
-            
-            // Initialize search functionality
-            initSearch();
-        }
+  <script>
+    // Simple HTML-only mapping app using Leaflet + OSM tiles + public services.
+    // No API keys required. Feel free to edit tile providers or swap services.
 
-        function addTileLayer(layerType) {
-            // Remove existing layers
-            map.eachLayer(function(layer) {
-                if (layer instanceof L.TileLayer) {
-                    map.removeLayer(layer);
-                }
-            });
-            
-            let tileLayer;
-            switch(layerType) {
-                case 'satellite':
-                    tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                    });
-                    break;
-                case 'terrain':
-                    tileLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
-                    });
-                    break;
-                default:
-                    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    });
-            }
-            
-            tileLayer.addTo(map);
-            
-            // Add traffic layer if enabled
-            if (showTraffic) {
-                addTrafficLayer();
-            }
-        }
+    // --- Map & Layers ---
+    const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'});
+    const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© OpenTopoMap contributors'});
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom: 19, attribution: 'Tiles © Esri'});
 
-        function addTrafficLayer() {
-            // Simulate traffic overlay with colored lines on major roads
-            const trafficData = [
-                { coords: [[40.7614, -73.9776], [40.7505, -73.9934]], color: '#ff4444', weight: 6 },
-                { coords: [[40.7505, -73.9934], [40.7411, -73.9897]], color: '#ffaa00', weight: 6 },
-                { coords: [[40.7589, -73.9851], [40.7614, -73.9776]], color: '#00aa00', weight: 6 },
-                { coords: [[40.7411, -73.9897], [40.7359, -73.9911]], color: '#ff4444', weight: 6 },
-                { coords: [[40.7614, -73.9776], [40.7589, -73.9851]], color: '#ffaa00', weight: 6 }
-            ];
-            
-            trafficData.forEach(segment => {
-                L.polyline(segment.coords, {
-                    color: segment.color,
-                    weight: segment.weight,
-                    opacity: 0.7,
-                    className: 'traffic-line'
-                }).addTo(map);
-            });
-        }
+    const map = L.map('map', {layers: [street], zoomControl: true, center: [20.5937,78.9629], zoom: 5});
 
-        function switchLayer(layerType, element) {
-            currentLayer = layerType;
-            
-            // Update active state
-            document.querySelectorAll('.layer-option').forEach(opt => opt.classList.remove('active'));
-            element.classList.add('active');
-            
-            addTileLayer(layerType);
-        }
+    const baseLayers = { 'Street': street, 'Topographic': topo, 'Satellite': satellite };
+    L.control.layers(baseLayers, null, {collapsed:true}).addTo(map);
 
-        function toggleTraffic() {
-            showTraffic = !showTraffic;
-            const toggle = document.getElementById('trafficToggle');
-            
-            if (showTraffic) {
-                toggle.classList.add('active');
-                addTrafficLayer();
-            } else {
-                toggle.classList.remove('active');
-                // Remove traffic lines
-                map.eachLayer(function(layer) {
-                    if (layer instanceof L.Polyline && layer.options.className === 'traffic-line') {
-                        map.removeLayer(layer);
-                    }
-                });
-            }
-        }
+    // --- Marker cluster group ---
+    const markers = L.markerClusterGroup();
+    map.addLayer(markers);
 
-        function onMapClick(e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            
-            // Create popup
-            const popup = L.popup()
-                .setLatLng(e.latlng)
-                .setContent(`
-                    <div class="custom-popup">
-                        <div class="popup-title">Selected Location</div>
-                        <div class="popup-address">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
-                        <div class="popup-actions">
-                            <button class="popup-btn" onclick="setAsStart(${lat}, ${lng})">Directions from here</button>
-                            <button class="popup-btn primary" onclick="setAsEnd(${lat}, ${lng})">Directions to here</button>
-                        </div>
-                    </div>
-                `)
-                .openOn(map);
-        }
+    // --- Load view from URL params (share link) ---
+    function readViewFromURL(){
+      const p = new URLSearchParams(window.location.search);
+      const lat = parseFloat(p.get('lat'));
+      const lon = parseFloat(p.get('lon'));
+      const z = parseInt(p.get('z'));
+      if (!isNaN(lat) && !isNaN(lon) && !isNaN(z)) map.setView([lat,lon],z);
+    }
+    readViewFromURL();
 
-        function setAsStart(lat, lng) {
-            document.getElementById('startInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            
-            if (startMarker) {
-                map.removeLayer(startMarker);
-            }
-            
-            startMarker = L.marker([lat, lng], {
-                icon: createCustomIcon('🟢', 'start-marker')
-            }).addTo(map);
-            
-            map.closePopup();
-            calculateRoute();
-        }
+    // --- Search (Nominatim) with simple autocomplete ---
+    const searchInput = document.getElementById('search');
+    const suggestions = document.getElementById('suggestions');
+    let searchTimeout = null;
+    searchInput.addEventListener('input', ()=>{
+      const q = searchInput.value.trim();
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (!q){suggestions.style.display='none'; return}
+      searchTimeout = setTimeout(()=>fetchSuggestions(q),300);
+    });
 
-        function setAsEnd(lat, lng) {
-            document.getElementById('endInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            
-            if (endMarker) {
-                map.removeLayer(endMarker);
-            }
-            
-            endMarker = L.marker([lat, lng], {
-                icon: createCustomIcon('🔴', 'end-marker')
-            }).addTo(map);
-            
-            map.closePopup();
-            calculateRoute();
-        }
+    async function fetchSuggestions(q){
+      try{
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&limit=6`;
+        const res = await fetch(url,{headers:{'Accept':'application/json'}});
+        const data = await res.json();
+        renderSuggestions(data);
+      }catch(e){console.error(e)}
+    }
+    function renderSuggestions(items){
+      suggestions.innerHTML='';
+      if (!items || items.length===0){suggestions.style.display='none';return}
+      items.forEach(it=>{
+        const btn = document.createElement('button');
+        btn.textContent = it.display_name;
+        btn.onclick = ()=>{
+          suggestions.style.display='none';
+          addPlaceFromSearch(it);
+        };
+        suggestions.appendChild(btn);
+      });
+      suggestions.style.display='block';
+    }
 
-        function createCustomIcon(emoji, className) {
-            return L.divIcon({
-                html: `<div style="
-                    font-size: 20px; 
-                    text-align: center; 
-                    line-height: 30px;
-                    background: white;
-                    border-radius: 50%;
-                    border: 2px solid #dadce0;
-                    width: 30px;
-                    height: 30px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                ">${emoji}</div>`,
-                className: className,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-        }
+    // When user presses Enter, search and zoom to first result
+    searchInput.addEventListener('keydown', async (e)=>{
+      if (e.key==='Enter'){
+        e.preventDefault();
+        const q = searchInput.value.trim();
+        if (!q) return;
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&addressdetails=1&limit=1`;
+        const res = await fetch(url); const data = await res.json();
+        if (data && data[0]) addPlaceFromSearch(data[0]);
+      }
+    });
 
-        function selectTransport(button, mode) {
-            currentTransportMode = mode;
-            
-            // Update active state
-            document.querySelectorAll('.transport-btn').forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            // Recalculate route if both points are set
-            if (startMarker && endMarker) {
-                calculateRoute();
-            }
-        }
+    // --- Place handling ---
+    const placesList = document.getElementById('placesList');
+    let savedPlaces = JSON.parse(localStorage.getItem('places_v1')||'[]');
+    function savePlaces(){ localStorage.setItem('places_v1', JSON.stringify(savedPlaces)); renderPlaces(); }
+    function renderPlaces(){
+      placesList.innerHTML = '';
+      if (savedPlaces.length===0){placesList.innerHTML='<div class="small muted">No places yet — search and click results to add.</div>';return}
+      savedPlaces.forEach((p,idx)=>{
+        const div = document.createElement('div'); div.className='place-item';
+        div.innerHTML = `<strong>${p.name}</strong><div class="small">${p.desc||''}</div>`;
+        div.onclick = ()=>{ map.setView([p.lat,p.lon],15) }
+        const btn = document.createElement('button'); btn.textContent='Remove'; btn.style.float='right'; btn.onclick=(e)=>{e.stopPropagation(); savedPlaces.splice(idx,1); savePlaces(); }
+        div.appendChild(btn);
+        placesList.appendChild(div);
+      });
+    }
+    renderPlaces();
 
-        function calculateRoute() {
-            const startInput = document.getElementById('startInput').value;
-            const endInput = document.getElementById('endInput').value;
-            
-            if (!startInput || !endInput) return;
-            
-            showNotification('Calculating route...');
-            
-            // Simulate route calculation
-            setTimeout(() => {
-                displayRoute();
-                showRouteInfo();
-            }, 1500);
-        }
+    function addPlaceFromSearch(item){
+      const lat = parseFloat(item.lat), lon = parseFloat(item.lon);
+      const name = item.display_name.split(',')[0];
+      const place = {name:name, desc:item.display_name, lat, lon};
+      savedPlaces.unshift(place); if (savedPlaces.length>50) savedPlaces.pop(); savePlaces();
+      const m = L.marker([lat,lon]); m.bindPopup(`<strong>${name}</strong><br/><small>${item.display_name}</small><br/><button onclick=\"window.postMessage({type:'addFav',lat:${lat},lon:${lon},name:${JSON.stringify(name)},desc:${JSON.stringify(item.display_name)}),true\">Add to favorites</button>`);
+      markers.addLayer(m); map.setView([lat,lon],15);
+    }
 
-        function displayRoute() {
-            // Remove existing route
-            if (routeLayer) {
-                map.removeLayer(routeLayer);
-            }
-            
-            // Create sample route between markers
-            if (startMarker && endMarker) {
-                const startLatLng = startMarker.getLatLng();
-                const endLatLng = endMarker.getLatLng();
-                
-                // Create a curved path between points
-                const midLat = (startLatLng.lat + endLatLng.lat) / 2 + (Math.random() - 0.5) * 0.01;
-                const midLng = (startLatLng.lng + endLatLng.lng) / 2 + (Math.random() - 0.5) * 0.01;
-                
-                const routeCoords = [
-                    [startLatLng.lat, startLatLng.lng],
-                    [midLat, midLng],
-                    [endLatLng.lat, endLatLng.lng]
-                ];
-                
-                const routeColor = {
-                    driving: '#1a73e8',
-                    transit: '#34a853',
-                    walking: '#fbbc04',
-                    bicycling: '#ea4335'
-                }[currentTransportMode];
-                
-                routeLayer = L.polyline(routeCoords, {
-                    color: routeColor,
-                    weight: 5,
-                    opacity: 0.8
-                }).addTo(map);
-                
-                // Fit map to show the route
-                const group = new L.featureGroup([startMarker, endMarker, routeLayer]);
-                map.fitBounds(group.getBounds().pad(0.1));
-            }
-        }
+    // Listen for postMessage from popup buttons (quick hack)
+    window.addEventListener('message', (ev)=>{
+      if (ev.data && ev.data.type==='addFav'){
+        savedPlaces.unshift({name:ev.data.name,desc:'',lat:ev.data.lat,lon:ev.data.lon}); savePlaces();
+      }
+    });
 
-        function showRouteInfo() {
-            const routeInfo = document.getElementById('routeInfo');
-            const routeTime = document.getElementById('routeTime');
-            const routeDistance = document.getElementById('routeDistance');
-            const routeDetails = document.getElementById('routeDetails');
-            
-            // Simulate different times based on transport mode
-            const times = {
-                driving: { time: '15 min', distance: '5.2 km', details: 'Fastest route now due to traffic conditions' },
-                transit: { time: '28 min', distance: '6.1 km', details: 'Take bus 42 and subway line 6' },
-                walking: { time: '1 h 5 min', distance: '5.0 km', details: 'Head north, then turn right on Broadway' },
-                bicycling: { time: '22 min', distance: '5.1 km', details: 'Mostly bike lanes, slight uphill' }
-            };
-            
-            const info = times[currentTransportMode];
-            
-            routeTime.textContent = info.time;
-            routeDistance.textContent = info.distance;
-            routeDetails.textContent = info.details;
-            
-            routeInfo.style.display = 'block';
-        }
+    // --- Geolocation ---
+    document.getElementById('btn-geolocate').addEventListener('click', ()=>{
+      if (!navigator.geolocation) return alert('Geolocation not available');
+      navigator.geolocation.getCurrentPosition(pos=>{
+        const lat=pos.coords.latitude, lon=pos.coords.longitude; map.setView([lat,lon],15);
+        const m = L.circleMarker([lat,lon],{radius:8,fill:true,fillColor:'#1a73e8',color:'#fff',weight:2}).addTo(map);
+        setTimeout(()=>map.removeLayer(m),5000);
+      }, err=>alert('Unable to get location: '+err.message));
+    });
 
-        function startNavigation() {
-            if (!routeLayer) {
-                showNotification('Please set a route first');
-                return;
-            }
-            
-            isNavigating = true;
-            document.getElementById('navigationPanel').classList.add('active');
-            
-            // Simulate navigation instructions
-            const instructions = [
-                { instruction: 'Head north on your current road', distance: 'Continue for 0.5 km' },
-                { instruction: 'Turn right onto Broadway', distance: 'In 200 m' },
-                { instruction: 'Continue straight for 1.2 km', distance: 'Continue for 1.2 km' },
-                { instruction: 'Turn left onto 5th Avenue', distance: 'In 300 m' },
-                { instruction: 'Your destination is on the right', distance: 'In 100 m' }
-            ];
-            
-            let currentStep = 0;
-            
-            function updateInstruction() {
-                if (currentStep < instructions.length) {
-                    document.getElementById('navInstruction').textContent = instructions[currentStep].instruction;
-                    document.getElementById('navDistance').textContent = instructions[currentStep].distance;
-                    currentStep++;
-                } else {
-                    showNotification('You have arrived at your destination!');
-                    stopNavigation();
-                }
-            }
-            
-            // Initial instruction
-            updateInstruction();
-            
-            // Update every 5 seconds
-            navigationInterval = setInterval(updateInstruction, 5000);
-            
-            showNotification('Navigation started');
-        }
+    // --- Save / share view ---
+    document.getElementById('btn-saveview').addEventListener('click', ()=>{
+      const c = map.getCenter(); const z = map.getZoom();
+      const url = new URL(window.location.href); url.searchParams.set('lat', c.lat.toFixed(6)); url.searchParams.set('lon', c.lng.toFixed(6)); url.searchParams.set('z', z);
+      navigator.clipboard.writeText(url.toString()).then(()=>alert('Share link copied to clipboard'))
+    });
 
-        function stopNavigation() {
-            isNavigating = false;
-            if (navigationInterval) {
-                clearInterval(navigationInterval);
-                navigationInterval = null;
-            }
-            document.getElementById('navigationPanel').classList.remove('active');
-        }
-
-        function getUserLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        
-                        // Add user location marker
-                        if (userLocationMarker) {
-                            map.removeLayer(userLocationMarker);
-                        }
-                        
-                        userLocationMarker = L.marker([lat, lng], {
-                            icon: createCustomIcon('📍', 'user-location')
-                        }).addTo(map);
-                        
-                        // Set as default start location
-                        document.getElementById('startInput').value = 'Your location';
-                        startMarker = userLocationMarker;
-                        
-                        showNotification('Location found');
-                    },
-                    function(error) {
-                        console.log('Geolocation error:', error);
-                        showNotification('Could not get your location');
-                    }
-                );
-            }
-        }
-
-        function addSampleMarkers() {
-            sampleLocations.forEach(location => {
-                const marker = L.marker(location.coords, {
-                    icon: createCustomIcon('📍', 'poi-marker')
-                }).addTo(map);
-                
-                marker.bindPopup(`
-                    <div class="custom-popup">
-                        <div class="popup-title">${location.name}</div>
-                        <div class="popup-address">${location.address}</div>
-                        <div class="popup-actions">
-                            <button class="popup-btn" onclick="setLocationAsStart(${location.coords[0]}, ${location.coords[1]}, '${location.name}')">From here</button>
-                            <button class="popup-btn primary" onclick="setLocationAsEnd(${location.coords[0]}, ${location.coords[1]}, '${location.name}')">To here</button>
-                        </div>
-                    </div>
-                `);
-            });
-        }
-
-        function setLocationAsStart(lat, lng, name) {
-            document.getElementById('startInput').value = name;
-            
-            if (startMarker && startMarker !== userLocationMarker) {
-                map.removeLayer(startMarker);
-            }
-            
-            startMarker = L.marker([lat, lng], {
-                icon: createCustomIcon('🟢', 'start-marker')
-            }).addTo(map);
-            
-            map.closePopup();
-            calculateRoute();
-        }
-
-        function setLocationAsEnd(lat, lng, name) {
-            document.getElementById('endInput').value = name;
-            
-            if (endMarker) {
-                map.removeLayer(endMarker);
-            }
-            
-            endMarker = L.marker([lat, lng], {
-                icon: createCustomIcon('🔴', 'end-marker')
-            }).addTo(map);
-            
-            map.closePopup();
-            calculateRoute();
-        }
-
-        function initSearch() {
-            const searchInput = document.getElementById('searchInput');
-            const searchResults = document.getElementById('searchResults');
-            
-            searchInput.addEventListener('input', function(e) {
-                const query = e.target.value.toLowerCase();
-                
-                if (query.length < 2) {
-                    searchResults.style.display = 'none';
-                    return;
-                }
-                
-                // Filter sample locations
-                const matches = sampleLocations.filter(location => 
-                    location.name.toLowerCase().includes(query) || 
-                    location.address.toLowerCase().includes(query)
-                );
-                
-                if (matches.length > 0) {
-                    searchResults.innerHTML = matches.map(location => `
-                        <div class="search-result-item" onclick="selectSearchResult(${location.coords[0]}, ${location.coords[1]}, '${location.name}', '${location.address}')">
-                            <div class="search-result-title">${location.name}</div>
-                            <div class="search-result-address">${location.address}</div>
-                        </div>
-                    `).join('');
-                    searchResults.style.display = 'block';
-                } else {
-                    searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
-                    searchResults.style.display = 'block';
-                }
-            });
-            
-            // Hide results when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-                    searchResults.style.display = 'none';
-                }
-            });
-        }
-
-        function selectSearchResult(lat, lng, name, address) {
-            // Center map on selected location
-            map.setView([lat, lng], 15);
-            
-            // Add marker if not already present
-            let existingMarker = null;
-            map.eachLayer(function(layer) {
-                if (layer instanceof L.Marker) {
-                    const markerPos = layer.getLatLng();
-                    if (Math.abs(markerPos.lat - lat) < 0.001 && Math.abs(markerPos.lng - lng) < 0.001) {
-                        existingMarker = layer;
-                    }
-                }
-            });
-            
-            if (!existingMarker) {
-                const marker = L.marker([lat, lng], {
-                    icon: createCustomIcon('📍', 'search-result-marker')
-                }).addTo(map);
-                
-                marker.bindPopup(`
-                    <div class="custom-popup">
-                        <div class="popup-title">${name}</div>
-                        <div class="popup-address">${address}</div>
-                        <div class="popup-actions">
-                            <button class="popup-btn" onclick="setLocationAsStart(${lat}, ${lng}, '${name}')">From here</button>
-                            <button class="popup-btn primary" onclick="setLocationAsEnd(${lat}, ${lng}, '${name}')">To here</button>
-                        </div>
-                    </div>
-                `).openPopup();
-            } else {
-                existingMarker.openPopup();
-            }
-            
-            // Clear search
-            document.getElementById('searchInput').value = '';
-            document.getElementById('searchResults').style.display = 'none';
-        }
-
-        function zoomIn() {
-            map.zoomIn();
-        }
-
-        function zoomOut() {
-            map.zoomOut();
-        }
-
-        function centerOnUser() {
-            if (userLocationMarker) {
-                map.setView(userLocationMarker.getLatLng(), 16);
-            } else {
-                getUserLocation();
-            }
-        }
-
-        function toggleStreetView() {
-            showNotification('Street View feature coming soon!');
-            // In a real implementation, this would integrate with Street View API
-        }
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-        }
-
-        function showNotification(message) {
-            // Remove existing notifications
-            document.querySelectorAll('.notification').forEach(n => n.remove());
-            
-            const notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: #202124;
-                color: white;
-                padding: 12px 24px;
-                border-radius: 8px;
-                z-index: 10000;
-                font-size: 14px;
-                box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-                animation: slideInDown 0.3s ease;
-            `;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                notification.style.animation = 'slideOutUp 0.3s ease';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Real-time traffic simulation
-        function simulateTrafficUpdates() {
-            if (!showTraffic) return;
-            
-            setInterval(() => {
-                if (showTraffic) {
-                    // Remove existing traffic lines
-                    map.eachLayer(function(layer) {
-                        if (layer instanceof L.Polyline && layer.options.className === 'traffic-line') {
-                            map.removeLayer(layer);
-                        }
-                    });
-                    
-                    // Add updated traffic
-                    addTrafficLayer();
-                }
-            }, 10000); // Update every 10 seconds
-        }
-
-        // Add some keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case 'f':
-                        e.preventDefault();
-                        document.getElementById('searchInput').focus();
-                        break;
-                    case 'd':
-                        e.preventDefault();
-                        document.getElementById('startInput').focus();
-                        break;
-                }
-            }
-            
-            if (e.key === 'Escape') {
-                if (isNavigating) {
-                    stopNavigation();
-                }
-                document.getElementById('searchResults').style.display = 'none';
-            }
+    // --- Routing (simple two-click route using OSRM) ---
+    let routingControl = null; let routePoints = [];
+    const routeInstructions = document.getElementById('routeInstructions');
+    document.getElementById('btn-route').addEventListener('click', ()=>{
+      routePoints = []; routeInstructions.innerHTML='Click two points on the map to get a route.';
+      map.once('click', (e)=>{ routePoints.push([e.latlng.lng,e.latlng.lat]); L.marker(e.latlng).addTo(map); map.once('click', (e2)=>{ routePoints.push([e2.latlng.lng,e2.latlng.lat]); showRoute(); })});
+    });
+    function showRoute(){
+      if (routePoints.length<2) return; const from = routePoints[0], to = routePoints[1];
+      const url = `https://router.project-osrm.org/route/v1/driving/${from[0]},${from[1]};${to[0]},${to[1]}?overview=full&geometries=geojson&steps=true`;
+      fetch(url).then(r=>r.json()).then(data=>{
+        if (!data.routes || !data.routes[0]) return alert('No route found');
+        const coords = data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+        if (routingControl) map.removeControl(routingControl);
+        const routeLine = L.polyline(coords,{color:'#1a73e8',weight:5,opacity:0.8}).addTo(map);
+        map.fitBounds(routeLine.getBounds());
+        // instructions
+        const legs = data.routes[0].legs || [];
+        routeInstructions.innerHTML = '';
+        legs.forEach((leg,li)=>{
+          leg.steps.forEach((s,si)=>{
+            const d = document.createElement('div'); d.className='small'; d.textContent = `${s.maneuver.instruction} — ${Math.round(s.distance)} m`; routeInstructions.appendChild(d);
+          });
         });
+      }).catch(e=>{console.error(e); alert('Routing error')});
+    }
 
-        // Add route input handlers
-        document.getElementById('startInput').addEventListener('input', function() {
-            if (this.value && document.getElementById('endInput').value) {
-                setTimeout(calculateRoute, 500);
-            }
-        });
+    // --- Draw & measure tools ---
+    const drawnItems = new L.FeatureGroup(); map.addLayer(drawnItems);
+    const drawControl = new L.Control.Draw({ position: 'topleft', draw: {circle:false,marker:true,polyline:true,polygon:true,rectangle:true}, edit: { featureGroup: drawnItems } });
+    map.addControl(drawControl);
+    map.on(L.Draw.Event.CREATED, function (e) { const layer = e.layer; drawnItems.addLayer(layer); if(layer instanceof L.Polygon){ const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]); alert('Area ≈ '+Math.round(area)+' m²'); } if(layer instanceof L.Polyline){ const dist = 0; } });
 
-        document.getElementById('endInput').addEventListener('input', function() {
-            if (this.value && document.getElementById('startInput').value) {
-                setTimeout(calculateRoute, 500);
-            }
-        });
+    // --- Keyboard shortcuts for zoom & locate ---
+    window.addEventListener('keydown', (e)=>{
+      if (e.key==='+'||e.key==='=') map.zoomIn();
+      if (e.key==='-') map.zoomOut();
+      if (e.key==='g') document.getElementById('btn-geolocate').click();
+    });
 
-        // Simulate GPS tracking during navigation
-        function simulateGPSTracking() {
-            if (!isNavigating || !routeLayer) return;
-            
-            // Simulate movement along route
-            const routeCoords = routeLayer.getLatLngs();
-            let currentIndex = 0;
-            
-            const trackingInterval = setInterval(() => {
-                if (!isNavigating || currentIndex >= routeCoords.length) {
-                    clearInterval(trackingInterval);
-                    return;
-                }
-                
-                if (userLocationMarker) {
-                    userLocationMarker.setLatLng(routeCoords[currentIndex]);
-                    map.panTo(routeCoords[currentIndex]);
-                }
-                
-                currentIndex++;
-            }, 2000);
-        }
+    // --- Add some demo markers (sample POIs) ---
+    const samplePOIs = [
+      {name:'Taj Mahal', lat:27.1751, lon:78.0421},
+      {name:'Gateway of India', lat:18.9219, lon:72.8347},
+      {name:'India Gate', lat:28.6129, lon:77.2295}
+    ];
+    samplePOIs.forEach(p=>{ const m=L.marker([p.lat,p.lon]).bindPopup(`<strong>${p.name}</strong>`); markers.addLayer(m); });
 
-        // Initialize everything when page loads
-        window.addEventListener('load', function() {
-            initMap();
-            simulateTrafficUpdates();
-            
-            // Start GPS simulation when navigation starts
-            const originalStartNavigation = startNavigation;
-            startNavigation = function() {
-                originalStartNavigation();
-                if (isNavigating) {
-                    simulateGPSTracking();
-                }
-            };
-        });
+    // --- Fit to markers ---
+    if (markers.getLayers().length) map.fitBounds(markers.getBounds().pad(0.2));
 
-        // Add some sample events
-        setTimeout(() => {
-            if (Math.random() > 0.7) {
-                showNotification('🚨 Traffic incident detected on your route');
-            }
-        }, 15000);
+    // --- Small UX: hide suggestions when clicking outside ---
+    document.addEventListener('click', (e)=>{ if (!document.querySelector('.search-box').contains(e.target)) suggestions.style.display='none'; });
 
-        setTimeout(() => {
-            if (Math.random() > 0.8) {
-                showNotification('⛽ Gas station nearby - Chevron (0.2 mi)');
-            }
-        }, 25000);
+    // --- Expose a small API for debugging ---
+    window._map = map; window._markers = markers;
 
-        // Add click handlers for route inputs
-        document.getElementById('startInput').addEventListener('click', function() {
-            if (this.value === 'Your location' || this.value === '') {
-                getUserLocation();
-            }
-        });
-
-        // Add Enter key support for inputs
-        document.getElementById('searchInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                const firstResult = document.querySelector('.search-result-item');
-                if (firstResult) {
-                    firstResult.click();
-                }
-            }
-        });
-
-        // Simulate real-time location sharing
-        function enableLocationSharing() {
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
-                    function(position) {
-                        if (userLocationMarker) {
-                            userLocationMarker.setLatLng([position.coords.latitude, position.coords.longitude]);
-                        }
-                    },
-                    function(error) {
-                        console.log('Location tracking error:', error);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        maximumAge: 30000,
-                        timeout: 27000
-                    }
-                );
-            }
-        }
-
-        // Enable location tracking
-        setTimeout(enableLocationSharing, 2000);
-    </script>
+    // --- Final notes ---
+    console.log('Map UI ready — no API keys needed. Features: search (Nominatim), routing (OSRM public), draw/measure, clustering, layers, geolocation, save favorites (localStorage), share view.');
+  </script>
 </body>
 </html>
