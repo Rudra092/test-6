@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NaviMaps - Interactive Navigation</title>
+    <title>Google Maps Clone</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <style>
         * {
             margin: 0;
@@ -12,10 +13,10 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
             height: 100vh;
             overflow: hidden;
-            background: #1a1a1a;
+            background: #ffffff;
         }
 
         .app-container {
@@ -25,382 +26,417 @@
         }
 
         .sidebar {
-            width: 350px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            width: 400px;
+            background: #ffffff;
+            border-right: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 20px rgba(0,0,0,0.3);
             z-index: 1000;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
         }
 
         .header {
-            padding: 20px;
-            background: rgba(0,0,0,0.2);
-            backdrop-filter: blur(10px);
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            padding: 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
         }
 
         .search-container {
             position: relative;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .search-input {
             width: 100%;
-            padding: 12px 40px 12px 15px;
-            border: none;
-            border-radius: 25px;
-            font-size: 14px;
-            background: rgba(255,255,255,0.9);
-            transition: all 0.3s ease;
+            padding: 12px 16px;
+            border: 2px solid #dadce0;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.2s;
         }
 
         .search-input:focus {
-            outline: none;
-            background: white;
-            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            border-color: #1a73e8;
+            box-shadow: 0 1px 6px rgba(32,33,36,.28);
         }
 
-        .search-btn {
-            position: absolute;
-            right: 5px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #4CAF50;
-            border: none;
-            border-radius: 50%;
-            width: 35px;
-            height: 35px;
-            cursor: pointer;
-            color: white;
-            transition: all 0.3s ease;
+        .directions-panel {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
-        .search-btn:hover {
-            background: #45a049;
-            transform: translateY(-50%) scale(1.1);
-        }
-
-        .route-inputs {
+        .directions-inputs {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
         }
 
-        .route-input {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 20px;
-            font-size: 13px;
-            background: rgba(255,255,255,0.85);
-            transition: all 0.3s ease;
+        .direction-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        .route-input:focus {
+        .direction-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .start-dot {
+            background: #34a853;
+        }
+
+        .end-dot {
+            background: #ea4335;
+        }
+
+        .direction-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
             outline: none;
-            background: white;
-            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+
+        .direction-input:focus {
+            border-color: #1a73e8;
         }
 
         .transport-modes {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin: 16px 0;
             justify-content: space-around;
         }
 
         .transport-btn {
             flex: 1;
             padding: 12px 8px;
-            border: none;
-            border-radius: 15px;
-            background: rgba(255,255,255,0.2);
-            color: white;
+            border: 2px solid #dadce0;
+            border-radius: 8px;
+            background: white;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
             font-size: 12px;
-            text-align: center;
+            color: #3c4043;
         }
 
         .transport-btn.active {
-            background: #4CAF50;
-            box-shadow: 0 5px 15px rgba(76,175,80,0.4);
-            transform: translateY(-2px);
+            border-color: #1a73e8;
+            background: #e8f0fe;
+            color: #1a73e8;
         }
 
         .transport-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-1px);
+            background: #f8f9fa;
         }
 
-        .features {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
+        .transport-icon {
+            font-size: 20px;
         }
 
-        .feature-section {
-            margin-bottom: 25px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
+        .route-info {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #e0e0e0;
         }
 
-        .feature-title {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #fff;
-        }
-
-        .toggle-container {
+        .route-summary {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
-        .toggle {
-            position: relative;
-            width: 50px;
-            height: 25px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 25px;
+        .route-time {
+            font-size: 24px;
+            font-weight: 500;
+            color: #1a73e8;
+        }
+
+        .route-distance {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        .route-details {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 8px;
+        }
+
+        .start-button {
+            width: 100%;
+            padding: 12px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
         }
 
-        .toggle.active {
-            background: #4CAF50;
-        }
-
-        .toggle::before {
-            content: '';
-            position: absolute;
-            width: 21px;
-            height: 21px;
-            background: white;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .toggle.active::before {
-            transform: translateX(25px);
+        .start-button:hover {
+            background: #1557b0;
         }
 
         .map-container {
             flex: 1;
             position: relative;
-            background: linear-gradient(45deg, #2c3e50, #3498db);
-            overflow: hidden;
         }
 
-        .map {
+        #map {
             width: 100%;
             height: 100%;
-            position: relative;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 40% 80%, rgba(120, 219, 255, 0.3) 0%, transparent 50%),
-                linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
-        .map-overlay {
+        .map-controls {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .street {
-            position: absolute;
-            background: rgba(255,255,255,0.8);
-            border-radius: 2px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .street.traffic-heavy {
-            background: #ff4444;
-            animation: pulse 2s infinite;
-        }
-
-        .street.traffic-medium {
-            background: #ffaa44;
-        }
-
-        .street.traffic-light {
-            background: #44ff44;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.8; }
-            50% { opacity: 1; }
-        }
-
-        .route-line {
-            position: absolute;
-            background: #2196F3;
-            height: 4px;
-            border-radius: 2px;
-            z-index: 100;
-            animation: routeAnimation 3s ease-in-out infinite;
-            box-shadow: 0 0 10px rgba(33,150,243,0.5);
-        }
-
-        @keyframes routeAnimation {
-            0%, 100% { box-shadow: 0 0 10px rgba(33,150,243,0.5); }
-            50% { box-shadow: 0 0 20px rgba(33,150,243,0.8); }
-        }
-
-        .marker {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            background: #ff4444;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-            z-index: 200;
-            animation: markerBounce 2s ease-in-out infinite;
-            cursor: pointer;
-        }
-
-        @keyframes markerBounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
-        }
-
-        .marker.start {
-            background: #4CAF50;
-        }
-
-        .marker.end {
-            background: #ff4444;
-        }
-
-        .controls {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
+            bottom: 24px;
+            right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
             z-index: 1000;
         }
 
         .control-btn {
-            width: 50px;
-            height: 50px;
-            border: none;
-            border-radius: 50%;
+            width: 40px;
+            height: 40px;
             background: white;
-            color: #333;
+            border: none;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
             cursor: pointer;
-            font-size: 18px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.2);
-            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s;
         }
 
         .control-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            background: #f8f9fa;
+        }
+
+        .layers-panel {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .layer-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #e0e0e0;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .layer-option:last-child {
+            border-bottom: none;
+        }
+
+        .layer-option:hover {
+            background: #f8f9fa;
+        }
+
+        .layer-option.active {
+            background: #e8f0fe;
+            color: #1a73e8;
+        }
+
+        .traffic-toggle {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            z-index: 1000;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .traffic-toggle:hover {
+            background: #f8f9fa;
+        }
+
+        .traffic-toggle.active {
+            background: #1a73e8;
+            color: white;
         }
 
         .navigation-panel {
             position: absolute;
-            top: 20px;
+            top: 16px;
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            padding: 20px 30px;
-            border-radius: 25px;
-            box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
             z-index: 1000;
+            min-width: 300px;
             display: none;
         }
 
         .navigation-panel.active {
             display: block;
-            animation: slideDown 0.5s ease;
+            animation: slideDown 0.3s ease;
         }
 
         @keyframes slideDown {
-            from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
 
         .nav-instruction {
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 4px;
         }
 
         .nav-distance {
             font-size: 14px;
-            color: #666;
-        }
-
-        .traffic-legend {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
-            z-index: 1000;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 8px;
-            font-size: 12px;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 4px;
-            border-radius: 2px;
+            color: #5f6368;
         }
 
         .mobile-toggle {
             display: none;
             position: fixed;
-            top: 20px;
-            left: 20px;
+            top: 16px;
+            left: 16px;
             z-index: 2000;
             background: white;
             border: none;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 18px;
+            width: 48px;
+            height: 48px;
+            font-size: 20px;
             cursor: pointer;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .search-results {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .search-result-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.2s;
+        }
+
+        .search-result-item:hover {
+            background: #f8f9fa;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-title {
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 2px;
+        }
+
+        .search-result-address {
+            font-size: 12px;
+            color: #5f6368;
+        }
+
+        .custom-popup {
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+        }
+
+        .custom-popup .popup-title {
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 4px;
+        }
+
+        .custom-popup .popup-address {
+            color: #5f6368;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .custom-popup .popup-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .custom-popup .popup-btn {
+            padding: 6px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .custom-popup .popup-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .custom-popup .popup-btn.primary {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
+        }
+
+        .custom-popup .popup-btn.primary:hover {
+            background: #1557b0;
+        }
+
+        .street-view-control {
+            position: absolute;
+            bottom: 80px;
+            right: 24px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            width: 40px;
+            height: 40px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 1000;
         }
 
         @media (max-width: 768px) {
@@ -424,6 +460,10 @@
             .map-container {
                 width: 100%;
             }
+
+            .layers-panel, .traffic-toggle {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -433,455 +473,627 @@
         
         <div class="sidebar" id="sidebar">
             <div class="header">
-                <div class="logo">
-                    🗺️ NaviMaps
-                </div>
-                
                 <div class="search-container">
-                    <input type="text" class="search-input" placeholder="Search places..." id="searchInput">
-                    <button class="search-btn" onclick="search()">🔍</button>
+                    <input type="text" class="search-input" placeholder="Search Google Maps" id="searchInput">
+                    <div class="search-results" id="searchResults" style="display: none;"></div>
                 </div>
                 
-                <div class="route-inputs">
-                    <input type="text" class="route-input" placeholder="From: Your location" id="fromInput" value="Current Location">
-                    <input type="text" class="route-input" placeholder="To: Choose destination" id="toInput">
-                </div>
-                
-                <div class="transport-modes">
-                    <button class="transport-btn active" data-mode="car" onclick="selectTransport('car')">🚗<br>Car</button>
-                    <button class="transport-btn" data-mode="bike" onclick="selectTransport('bike')">🚴<br>Bike</button>
-                    <button class="transport-btn" data-mode="walk" onclick="selectTransport('walk')">🚶<br>Walk</button>
-                </div>
-            </div>
-            
-            <div class="features">
-                <div class="feature-section">
-                    <div class="feature-title">Traffic Information</div>
-                    <div class="toggle-container">
-                        <span>Live Traffic</span>
-                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="traffic"></div>
+                <div class="directions-panel">
+                    <div class="directions-inputs">
+                        <div class="direction-input-container">
+                            <div class="direction-dot start-dot"></div>
+                            <input type="text" class="direction-input" placeholder="Choose starting point" id="startInput">
+                        </div>
+                        <div class="direction-input-container">
+                            <div class="direction-dot end-dot"></div>
+                            <input type="text" class="direction-input" placeholder="Choose destination" id="endInput">
+                        </div>
                     </div>
-                    <div class="toggle-container">
-                        <span>Traffic Alerts</span>
-                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="alerts"></div>
-                    </div>
-                </div>
-                
-                <div class="feature-section">
-                    <div class="feature-title">Map Layers</div>
-                    <div class="toggle-container">
-                        <span>Satellite View</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="satellite"></div>
-                    </div>
-                    <div class="toggle-container">
-                        <span>Street View</span>
-                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="street"></div>
-                    </div>
-                    <div class="toggle-container">
-                        <span>3D Buildings</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="3d"></div>
+                    
+                    <div class="transport-modes">
+                        <button class="transport-btn active" data-mode="driving" onclick="selectTransport(this, 'driving')">
+                            <div class="transport-icon">🚗</div>
+                            <div>Driving</div>
+                        </button>
+                        <button class="transport-btn" data-mode="transit" onclick="selectTransport(this, 'transit')">
+                            <div class="transport-icon">🚌</div>
+                            <div>Transit</div>
+                        </button>
+                        <button class="transport-btn" data-mode="walking" onclick="selectTransport(this, 'walking')">
+                            <div class="transport-icon">🚶</div>
+                            <div>Walking</div>
+                        </button>
+                        <button class="transport-btn" data-mode="bicycling" onclick="selectTransport(this, 'bicycling')">
+                            <div class="transport-icon">🚴</div>
+                            <div>Cycling</div>
+                        </button>
                     </div>
                 </div>
                 
-                <div class="feature-section">
-                    <div class="feature-title">Points of Interest</div>
-                    <div class="toggle-container">
-                        <span>Gas Stations</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="gas"></div>
+                <div class="route-info" id="routeInfo" style="display: none;">
+                    <div class="route-summary">
+                        <div class="route-time" id="routeTime">15 min</div>
+                        <div class="route-distance" id="routeDistance">5.2 km</div>
                     </div>
-                    <div class="toggle-container">
-                        <span>Restaurants</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="restaurants"></div>
-                    </div>
-                    <div class="toggle-container">
-                        <span>Hotels</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="hotels"></div>
-                    </div>
-                </div>
-                
-                <div class="feature-section">
-                    <div class="feature-title">Navigation</div>
-                    <div class="toggle-container">
-                        <span>Voice Guidance</span>
-                        <div class="toggle active" onclick="toggleFeature(this)" data-feature="voice"></div>
-                    </div>
-                    <div class="toggle-container">
-                        <span>Avoid Tolls</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="tolls"></div>
-                    </div>
-                    <div class="toggle-container">
-                        <span>Avoid Highways</span>
-                        <div class="toggle" onclick="toggleFeature(this)" data-feature="highways"></div>
-                    </div>
+                    <div class="route-details" id="routeDetails">Fastest route now due to traffic conditions</div>
+                    <button class="start-button" onclick="startNavigation()">Start</button>
                 </div>
             </div>
         </div>
         
         <div class="map-container">
-            <div class="map" id="map">
-                <div class="map-overlay" id="mapOverlay"></div>
+            <div id="map"></div>
+            
+            <div class="traffic-toggle" onclick="toggleTraffic()" id="trafficToggle">
+                🚦 Traffic
+            </div>
+            
+            <div class="layers-panel">
+                <div class="layer-option active" onclick="switchLayer('default', this)">Default</div>
+                <div class="layer-option" onclick="switchLayer('satellite', this)">Satellite</div>
+                <div class="layer-option" onclick="switchLayer('terrain', this)">Terrain</div>
+            </div>
+            
+            <button class="street-view-control" onclick="toggleStreetView()" title="Street View">👁️</button>
+            
+            <div class="map-controls">
+                <button class="control-btn" onclick="zoomIn()" title="Zoom in">+</button>
+                <button class="control-btn" onclick="zoomOut()" title="Zoom out">−</button>
+                <button class="control-btn" onclick="centerOnUser()" title="Your location">📍</button>
             </div>
             
             <div class="navigation-panel" id="navigationPanel">
-                <div class="nav-instruction" id="navInstruction">Turn right onto Main Street</div>
-                <div class="nav-distance" id="navDistance">In 500 meters</div>
-            </div>
-            
-            <div class="traffic-legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #44ff44;"></div>
-                    <span>Light Traffic</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #ffaa44;"></div>
-                    <span>Medium Traffic</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background: #ff4444;"></div>
-                    <span>Heavy Traffic</span>
-                </div>
-            </div>
-            
-            <div class="controls">
-                <button class="control-btn" onclick="zoomIn()" title="Zoom In">+</button>
-                <button class="control-btn" onclick="zoomOut()" title="Zoom Out">−</button>
-                <button class="control-btn" onclick="centerLocation()" title="My Location">📍</button>
-                <button class="control-btn" onclick="startNavigation()" title="Start Navigation">🧭</button>
+                <div class="nav-instruction" id="navInstruction">Head north on Main St</div>
+                <div class="nav-distance" id="navDistance">Continue for 0.5 km</div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
-        // Global variables
-        let currentTransportMode = 'car';
+        let map;
+        let currentLayer = 'default';
+        let showTraffic = false;
         let isNavigating = false;
-        let navigationInterval;
-        let zoomLevel = 1;
-        let features = {
-            traffic: true,
-            alerts: true,
-            satellite: false,
-            street: true,
-            '3d': false,
-            gas: false,
-            restaurants: false,
-            hotels: false,
-            voice: true,
-            tolls: false,
-            highways: false
-        };
+        let routeLayer = null;
+        let startMarker = null;
+        let endMarker = null;
+        let userLocationMarker = null;
+        let currentTransportMode = 'driving';
+        let navigationInterval = null;
 
-        // Initialize the map
+        // Sample locations for demo
+        const sampleLocations = [
+            { name: 'Times Square, New York', coords: [40.7580, -73.9855], address: 'Manhattan, NY 10036, USA' },
+            { name: 'Central Park', coords: [40.7829, -73.9654], address: 'New York, NY, USA' },
+            { name: 'Statue of Liberty', coords: [40.6892, -74.0445], address: 'New York, NY 10004, USA' },
+            { name: 'Brooklyn Bridge', coords: [40.7061, -73.9969], address: 'New York, NY, USA' },
+            { name: 'Empire State Building', coords: [40.7484, -73.9857], address: '350 5th Ave, New York, NY 10118, USA' },
+            { name: 'Golden Gate Bridge', coords: [37.8199, -122.4783], address: 'San Francisco, CA, USA' },
+            { name: 'Hollywood Sign', coords: [34.1341, -118.3215], address: 'Los Angeles, CA 90068, USA' },
+            { name: 'Space Needle', coords: [47.6205, -122.3493], address: 'Seattle, WA 98109, USA' }
+        ];
+
         function initMap() {
-            const mapOverlay = document.getElementById('mapOverlay');
+            // Initialize map centered on New York
+            map = L.map('map').setView([40.7589, -73.9851], 13);
             
-            // Create street network with traffic data
-            createStreetNetwork(mapOverlay);
-            createPOIMarkers(mapOverlay);
+            // Add default tile layer (OpenStreetMap)
+            addTileLayer('default');
             
-            // Simulate real-time traffic updates
-            setInterval(updateTraffic, 5000);
-        }
-
-        function createStreetNetwork(container) {
-            const streets = [
-                // Horizontal streets
-                { x: 10, y: 20, width: 200, height: 4, traffic: 'light' },
-                { x: 250, y: 20, width: 150, height: 4, traffic: 'heavy' },
-                { x: 10, y: 80, width: 180, height: 4, traffic: 'medium' },
-                { x: 220, y: 80, width: 200, height: 4, traffic: 'light' },
-                { x: 50, y: 140, width: 250, height: 4, traffic: 'medium' },
-                { x: 10, y: 200, width: 300, height: 4, traffic: 'heavy' },
-                { x: 80, y: 260, width: 200, height: 4, traffic: 'light' },
-                
-                // Vertical streets
-                { x: 60, y: 10, width: 4, height: 150, traffic: 'medium' },
-                { x: 150, y: 30, width: 4, height: 180, traffic: 'light' },
-                { x: 240, y: 15, width: 4, height: 200, traffic: 'heavy' },
-                { x: 320, y: 40, width: 4, height: 160, traffic: 'medium' },
-                { x: 100, y: 120, width: 4, height: 120, traffic: 'light' },
-            ];
-
-            streets.forEach(street => {
-                const streetEl = document.createElement('div');
-                streetEl.className = `street traffic-${street.traffic}`;
-                streetEl.style.left = street.x + 'px';
-                streetEl.style.top = street.y + 'px';
-                streetEl.style.width = street.width + 'px';
-                streetEl.style.height = street.height + 'px';
-                container.appendChild(streetEl);
-            });
-        }
-
-        function createPOIMarkers(container) {
-            const markers = [
-                { x: 100, y: 50, type: 'start', label: 'Start' },
-                { x: 300, y: 180, type: 'end', label: 'Destination' },
-                { x: 200, y: 120, type: 'poi', label: 'Restaurant' },
-                { x: 150, y: 90, type: 'poi', label: 'Gas Station' }
-            ];
-
-            markers.forEach(marker => {
-                const markerEl = document.createElement('div');
-                markerEl.className = `marker ${marker.type}`;
-                markerEl.style.left = (marker.x - 15) + 'px';
-                markerEl.style.top = (marker.y - 15) + 'px';
-                markerEl.title = marker.label;
-                markerEl.onclick = () => showMarkerInfo(marker);
-                container.appendChild(markerEl);
-            });
-
-            // Create route line
-            if (features.street) {
-                createRouteLine(container);
-            }
-        }
-
-        function createRouteLine(container) {
-            const routeSegments = [
-                { x: 115, y: 52, width: 140, height: 4, rotation: 0 },
-                { x: 240, y: 52, width: 4, height: 28, rotation: 90 },
-                { x: 242, y: 78, width: 60, height: 4, rotation: 0 },
-                { x: 300, y: 80, width: 4, height: 100, rotation: 90 }
-            ];
-
-            routeSegments.forEach(segment => {
-                const routeEl = document.createElement('div');
-                routeEl.className = 'route-line';
-                routeEl.style.left = segment.x + 'px';
-                routeEl.style.top = segment.y + 'px';
-                routeEl.style.width = segment.width + 'px';
-                routeEl.style.height = segment.height + 'px';
-                if (segment.rotation) {
-                    routeEl.style.transform = `rotate(${segment.rotation}deg)`;
-                }
-                container.appendChild(routeEl);
-            });
-        }
-
-        function updateTraffic() {
-            if (!features.traffic) return;
+            // Add click handler for map
+            map.on('click', onMapClick);
             
-            const streets = document.querySelectorAll('.street');
-            streets.forEach(street => {
-                const currentClass = street.className;
-                const trafficTypes = ['light', 'medium', 'heavy'];
-                const randomTraffic = trafficTypes[Math.floor(Math.random() * trafficTypes.length)];
-                
-                // 20% chance to change traffic
-                if (Math.random() < 0.2) {
-                    street.className = `street traffic-${randomTraffic}`;
+            // Get user location
+            getUserLocation();
+            
+            // Add some sample markers
+            addSampleMarkers();
+            
+            // Initialize search functionality
+            initSearch();
+        }
+
+        function addTileLayer(layerType) {
+            // Remove existing layers
+            map.eachLayer(function(layer) {
+                if (layer instanceof L.TileLayer) {
+                    map.removeLayer(layer);
                 }
             });
-        }
-
-        function selectTransport(mode) {
-            currentTransportMode = mode;
-            document.querySelectorAll('.transport-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
             
-            // Update route visualization based on transport mode
-            updateRouteForMode(mode);
-        }
-
-        function updateRouteForMode(mode) {
-            const routeLines = document.querySelectorAll('.route-line');
-            routeLines.forEach(line => {
-                switch(mode) {
-                    case 'car':
-                        line.style.background = '#2196F3';
-                        line.style.height = '4px';
-                        break;
-                    case 'bike':
-                        line.style.background = '#FF9800';
-                        line.style.height = '3px';
-                        break;
-                    case 'walk':
-                        line.style.background = '#4CAF50';
-                        line.style.height = '2px';
-                        break;
-                }
-            });
-        }
-
-        function toggleFeature(toggle) {
-            const feature = toggle.dataset.feature;
-            features[feature] = !features[feature];
-            toggle.classList.toggle('active');
-            
-            // Apply feature changes
-            applyFeatureChanges(feature, features[feature]);
-        }
-
-        function applyFeatureChanges(feature, enabled) {
-            const mapContainer = document.querySelector('.map');
-            
-            switch(feature) {
-                case 'traffic':
-                    const streets = document.querySelectorAll('.street');
-                    streets.forEach(street => {
-                        if (enabled) {
-                            street.style.display = 'block';
-                        } else {
-                            street.style.background = 'rgba(255,255,255,0.8)';
-                            street.classList.remove('traffic-heavy', 'traffic-medium', 'traffic-light');
-                        }
+            let tileLayer;
+            switch(layerType) {
+                case 'satellite':
+                    tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                     });
                     break;
-                    
-                case 'satellite':
-                    if (enabled) {
-                        mapContainer.style.background = 'url("data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cdefs%3E%3Cpattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"%3E%3Cpath d="M 10 0 L 0 0 0 10" fill="none" stroke="%23333" stroke-width="0.5"/%3E%3C/pattern%3E%3C/defs%3E%3Crect width="100" height="100" fill="%234a5568"/%3E%3Crect width="100" height="100" fill="url(%23grid)"/%3E%3C/svg%3E")';
-                    } else {
-                        mapContainer.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    }
+                case 'terrain':
+                    tileLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                    });
                     break;
-                    
-                case 'voice':
-                    if (enabled && isNavigating) {
-                        showNotification('Voice guidance enabled');
-                    }
-                    break;
+                default:
+                    tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    });
+            }
+            
+            tileLayer.addTo(map);
+            
+            // Add traffic layer if enabled
+            if (showTraffic) {
+                addTrafficLayer();
             }
         }
 
-        function search() {
-            const searchInput = document.getElementById('searchInput');
-            const query = searchInput.value.trim();
+        function addTrafficLayer() {
+            // Simulate traffic overlay with colored lines on major roads
+            const trafficData = [
+                { coords: [[40.7614, -73.9776], [40.7505, -73.9934]], color: '#ff4444', weight: 6 },
+                { coords: [[40.7505, -73.9934], [40.7411, -73.9897]], color: '#ffaa00', weight: 6 },
+                { coords: [[40.7589, -73.9851], [40.7614, -73.9776]], color: '#00aa00', weight: 6 },
+                { coords: [[40.7411, -73.9897], [40.7359, -73.9911]], color: '#ff4444', weight: 6 },
+                { coords: [[40.7614, -73.9776], [40.7589, -73.9851]], color: '#ffaa00', weight: 6 }
+            ];
             
-            if (query) {
-                showNotification(`Searching for "${query}"...`);
-                
-                // Simulate search results
-                setTimeout(() => {
-                    document.getElementById('toInput').value = query;
-                    showNotification(`Found: ${query}`);
-                }, 1000);
+            trafficData.forEach(segment => {
+                L.polyline(segment.coords, {
+                    color: segment.color,
+                    weight: segment.weight,
+                    opacity: 0.7,
+                    className: 'traffic-line'
+                }).addTo(map);
+            });
+        }
+
+        function switchLayer(layerType, element) {
+            currentLayer = layerType;
+            
+            // Update active state
+            document.querySelectorAll('.layer-option').forEach(opt => opt.classList.remove('active'));
+            element.classList.add('active');
+            
+            addTileLayer(layerType);
+        }
+
+        function toggleTraffic() {
+            showTraffic = !showTraffic;
+            const toggle = document.getElementById('trafficToggle');
+            
+            if (showTraffic) {
+                toggle.classList.add('active');
+                addTrafficLayer();
+            } else {
+                toggle.classList.remove('active');
+                // Remove traffic lines
+                map.eachLayer(function(layer) {
+                    if (layer instanceof L.Polyline && layer.options.className === 'traffic-line') {
+                        map.removeLayer(layer);
+                    }
+                });
             }
+        }
+
+        function onMapClick(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            // Create popup
+            const popup = L.popup()
+                .setLatLng(e.latlng)
+                .setContent(`
+                    <div class="custom-popup">
+                        <div class="popup-title">Selected Location</div>
+                        <div class="popup-address">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+                        <div class="popup-actions">
+                            <button class="popup-btn" onclick="setAsStart(${lat}, ${lng})">Directions from here</button>
+                            <button class="popup-btn primary" onclick="setAsEnd(${lat}, ${lng})">Directions to here</button>
+                        </div>
+                    </div>
+                `)
+                .openOn(map);
+        }
+
+        function setAsStart(lat, lng) {
+            document.getElementById('startInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            
+            if (startMarker) {
+                map.removeLayer(startMarker);
+            }
+            
+            startMarker = L.marker([lat, lng], {
+                icon: createCustomIcon('🟢', 'start-marker')
+            }).addTo(map);
+            
+            map.closePopup();
+            calculateRoute();
+        }
+
+        function setAsEnd(lat, lng) {
+            document.getElementById('endInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            
+            if (endMarker) {
+                map.removeLayer(endMarker);
+            }
+            
+            endMarker = L.marker([lat, lng], {
+                icon: createCustomIcon('🔴', 'end-marker')
+            }).addTo(map);
+            
+            map.closePopup();
+            calculateRoute();
+        }
+
+        function createCustomIcon(emoji, className) {
+            return L.divIcon({
+                html: `<div style="
+                    font-size: 20px; 
+                    text-align: center; 
+                    line-height: 30px;
+                    background: white;
+                    border-radius: 50%;
+                    border: 2px solid #dadce0;
+                    width: 30px;
+                    height: 30px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                ">${emoji}</div>`,
+                className: className,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        }
+
+        function selectTransport(button, mode) {
+            currentTransportMode = mode;
+            
+            // Update active state
+            document.querySelectorAll('.transport-btn').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            // Recalculate route if both points are set
+            if (startMarker && endMarker) {
+                calculateRoute();
+            }
+        }
+
+        function calculateRoute() {
+            const startInput = document.getElementById('startInput').value;
+            const endInput = document.getElementById('endInput').value;
+            
+            if (!startInput || !endInput) return;
+            
+            showNotification('Calculating route...');
+            
+            // Simulate route calculation
+            setTimeout(() => {
+                displayRoute();
+                showRouteInfo();
+            }, 1500);
+        }
+
+        function displayRoute() {
+            // Remove existing route
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+            }
+            
+            // Create sample route between markers
+            if (startMarker && endMarker) {
+                const startLatLng = startMarker.getLatLng();
+                const endLatLng = endMarker.getLatLng();
+                
+                // Create a curved path between points
+                const midLat = (startLatLng.lat + endLatLng.lat) / 2 + (Math.random() - 0.5) * 0.01;
+                const midLng = (startLatLng.lng + endLatLng.lng) / 2 + (Math.random() - 0.5) * 0.01;
+                
+                const routeCoords = [
+                    [startLatLng.lat, startLatLng.lng],
+                    [midLat, midLng],
+                    [endLatLng.lat, endLatLng.lng]
+                ];
+                
+                const routeColor = {
+                    driving: '#1a73e8',
+                    transit: '#34a853',
+                    walking: '#fbbc04',
+                    bicycling: '#ea4335'
+                }[currentTransportMode];
+                
+                routeLayer = L.polyline(routeCoords, {
+                    color: routeColor,
+                    weight: 5,
+                    opacity: 0.8
+                }).addTo(map);
+                
+                // Fit map to show the route
+                const group = new L.featureGroup([startMarker, endMarker, routeLayer]);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function showRouteInfo() {
+            const routeInfo = document.getElementById('routeInfo');
+            const routeTime = document.getElementById('routeTime');
+            const routeDistance = document.getElementById('routeDistance');
+            const routeDetails = document.getElementById('routeDetails');
+            
+            // Simulate different times based on transport mode
+            const times = {
+                driving: { time: '15 min', distance: '5.2 km', details: 'Fastest route now due to traffic conditions' },
+                transit: { time: '28 min', distance: '6.1 km', details: 'Take bus 42 and subway line 6' },
+                walking: { time: '1 h 5 min', distance: '5.0 km', details: 'Head north, then turn right on Broadway' },
+                bicycling: { time: '22 min', distance: '5.1 km', details: 'Mostly bike lanes, slight uphill' }
+            };
+            
+            const info = times[currentTransportMode];
+            
+            routeTime.textContent = info.time;
+            routeDistance.textContent = info.distance;
+            routeDetails.textContent = info.details;
+            
+            routeInfo.style.display = 'block';
         }
 
         function startNavigation() {
-            const fromInput = document.getElementById('fromInput').value;
-            const toInput = document.getElementById('toInput').value;
-            
-            if (!toInput.trim()) {
-                showNotification('Please enter a destination');
+            if (!routeLayer) {
+                showNotification('Please set a route first');
                 return;
             }
             
-            isNavigating = !isNavigating;
-            const navPanel = document.getElementById('navigationPanel');
+            isNavigating = true;
+            document.getElementById('navigationPanel').classList.add('active');
             
-            if (isNavigating) {
-                navPanel.classList.add('active');
-                showNotification('Navigation started');
-                
-                // Simulate navigation instructions
-                const instructions = [
-                    { instruction: 'Head north on Main Street', distance: 'for 200 meters' },
-                    { instruction: 'Turn right onto Oak Avenue', distance: 'in 500 meters' },
-                    { instruction: 'Continue straight', distance: 'for 1.2 km' },
-                    { instruction: 'Turn left onto Park Road', distance: 'in 300 meters' },
-                    { instruction: 'Destination on your right', distance: 'in 100 meters' }
-                ];
-                
-                let currentInstruction = 0;
-                navigationInterval = setInterval(() => {
-                    if (currentInstruction < instructions.length) {
-                        document.getElementById('navInstruction').textContent = instructions[currentInstruction].instruction;
-                        document.getElementById('navDistance').textContent = instructions[currentInstruction].distance;
-                        currentInstruction++;
-                        
-                        if (features.voice) {
-                            // Simulate voice guidance
-                            showNotification('🔊 ' + instructions[currentInstruction - 1].instruction);
-                        }
-                    } else {
-                        clearInterval(navigationInterval);
-                        showNotification('You have arrived at your destination!');
-                        stopNavigation();
-                    }
-                }, 3000);
-            } else {
-                stopNavigation();
+            // Simulate navigation instructions
+            const instructions = [
+                { instruction: 'Head north on your current road', distance: 'Continue for 0.5 km' },
+                { instruction: 'Turn right onto Broadway', distance: 'In 200 m' },
+                { instruction: 'Continue straight for 1.2 km', distance: 'Continue for 1.2 km' },
+                { instruction: 'Turn left onto 5th Avenue', distance: 'In 300 m' },
+                { instruction: 'Your destination is on the right', distance: 'In 100 m' }
+            ];
+            
+            let currentStep = 0;
+            
+            function updateInstruction() {
+                if (currentStep < instructions.length) {
+                    document.getElementById('navInstruction').textContent = instructions[currentStep].instruction;
+                    document.getElementById('navDistance').textContent = instructions[currentStep].distance;
+                    currentStep++;
+                } else {
+                    showNotification('You have arrived at your destination!');
+                    stopNavigation();
+                }
             }
+            
+            // Initial instruction
+            updateInstruction();
+            
+            // Update every 5 seconds
+            navigationInterval = setInterval(updateInstruction, 5000);
+            
+            showNotification('Navigation started');
         }
 
         function stopNavigation() {
             isNavigating = false;
-            clearInterval(navigationInterval);
+            if (navigationInterval) {
+                clearInterval(navigationInterval);
+                navigationInterval = null;
+            }
             document.getElementById('navigationPanel').classList.remove('active');
-            showNotification('Navigation stopped');
+        }
+
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        // Add user location marker
+                        if (userLocationMarker) {
+                            map.removeLayer(userLocationMarker);
+                        }
+                        
+                        userLocationMarker = L.marker([lat, lng], {
+                            icon: createCustomIcon('📍', 'user-location')
+                        }).addTo(map);
+                        
+                        // Set as default start location
+                        document.getElementById('startInput').value = 'Your location';
+                        startMarker = userLocationMarker;
+                        
+                        showNotification('Location found');
+                    },
+                    function(error) {
+                        console.log('Geolocation error:', error);
+                        showNotification('Could not get your location');
+                    }
+                );
+            }
+        }
+
+        function addSampleMarkers() {
+            sampleLocations.forEach(location => {
+                const marker = L.marker(location.coords, {
+                    icon: createCustomIcon('📍', 'poi-marker')
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <div class="custom-popup">
+                        <div class="popup-title">${location.name}</div>
+                        <div class="popup-address">${location.address}</div>
+                        <div class="popup-actions">
+                            <button class="popup-btn" onclick="setLocationAsStart(${location.coords[0]}, ${location.coords[1]}, '${location.name}')">From here</button>
+                            <button class="popup-btn primary" onclick="setLocationAsEnd(${location.coords[0]}, ${location.coords[1]}, '${location.name}')">To here</button>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        function setLocationAsStart(lat, lng, name) {
+            document.getElementById('startInput').value = name;
+            
+            if (startMarker && startMarker !== userLocationMarker) {
+                map.removeLayer(startMarker);
+            }
+            
+            startMarker = L.marker([lat, lng], {
+                icon: createCustomIcon('🟢', 'start-marker')
+            }).addTo(map);
+            
+            map.closePopup();
+            calculateRoute();
+        }
+
+        function setLocationAsEnd(lat, lng, name) {
+            document.getElementById('endInput').value = name;
+            
+            if (endMarker) {
+                map.removeLayer(endMarker);
+            }
+            
+            endMarker = L.marker([lat, lng], {
+                icon: createCustomIcon('🔴', 'end-marker')
+            }).addTo(map);
+            
+            map.closePopup();
+            calculateRoute();
+        }
+
+        function initSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
+            
+            searchInput.addEventListener('input', function(e) {
+                const query = e.target.value.toLowerCase();
+                
+                if (query.length < 2) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                // Filter sample locations
+                const matches = sampleLocations.filter(location => 
+                    location.name.toLowerCase().includes(query) || 
+                    location.address.toLowerCase().includes(query)
+                );
+                
+                if (matches.length > 0) {
+                    searchResults.innerHTML = matches.map(location => `
+                        <div class="search-result-item" onclick="selectSearchResult(${location.coords[0]}, ${location.coords[1]}, '${location.name}', '${location.address}')">
+                            <div class="search-result-title">${location.name}</div>
+                            <div class="search-result-address">${location.address}</div>
+                        </div>
+                    `).join('');
+                    searchResults.style.display = 'block';
+                } else {
+                    searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+                    searchResults.style.display = 'block';
+                }
+            });
+            
+            // Hide results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                    searchResults.style.display = 'none';
+                }
+            });
+        }
+
+        function selectSearchResult(lat, lng, name, address) {
+            // Center map on selected location
+            map.setView([lat, lng], 15);
+            
+            // Add marker if not already present
+            let existingMarker = null;
+            map.eachLayer(function(layer) {
+                if (layer instanceof L.Marker) {
+                    const markerPos = layer.getLatLng();
+                    if (Math.abs(markerPos.lat - lat) < 0.001 && Math.abs(markerPos.lng - lng) < 0.001) {
+                        existingMarker = layer;
+                    }
+                }
+            });
+            
+            if (!existingMarker) {
+                const marker = L.marker([lat, lng], {
+                    icon: createCustomIcon('📍', 'search-result-marker')
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <div class="custom-popup">
+                        <div class="popup-title">${name}</div>
+                        <div class="popup-address">${address}</div>
+                        <div class="popup-actions">
+                            <button class="popup-btn" onclick="setLocationAsStart(${lat}, ${lng}, '${name}')">From here</button>
+                            <button class="popup-btn primary" onclick="setLocationAsEnd(${lat}, ${lng}, '${name}')">To here</button>
+                        </div>
+                    </div>
+                `).openPopup();
+            } else {
+                existingMarker.openPopup();
+            }
+            
+            // Clear search
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').style.display = 'none';
         }
 
         function zoomIn() {
-            zoomLevel = Math.min(zoomLevel + 0.2, 3);
-            applyZoom();
+            map.zoomIn();
         }
 
         function zoomOut() {
-            zoomLevel = Math.max(zoomLevel - 0.2, 0.5);
-            applyZoom();
+            map.zoomOut();
         }
 
-        function applyZoom() {
-            const mapOverlay = document.getElementById('mapOverlay');
-            mapOverlay.style.transform = `scale(${zoomLevel})`;
-            mapOverlay.style.transformOrigin = 'center center';
+        function centerOnUser() {
+            if (userLocationMarker) {
+                map.setView(userLocationMarker.getLatLng(), 16);
+            } else {
+                getUserLocation();
+            }
         }
 
-        function centerLocation() {
-            showNotification('Centered on your location');
-            // Reset zoom and position
-            zoomLevel = 1;
-            applyZoom();
+        function toggleStreetView() {
+            showNotification('Street View feature coming soon!');
+            // In a real implementation, this would integrate with Street View API
         }
 
-        function showMarkerInfo(marker) {
-            showNotification(`📍 ${marker.label}`);
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
         }
 
         function showNotification(message) {
-            // Create notification element
+            // Remove existing notifications
+            document.querySelectorAll('.notification').forEach(n => n.remove());
+            
             const notification = document.createElement('div');
+            notification.className = 'notification';
             notification.style.cssText = `
                 position: fixed;
                 top: 20px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: #333;
+                background: #202124;
                 color: white;
-                padding: 10px 20px;
-                border-radius: 25px;
+                padding: 12px 24px;
+                border-radius: 8px;
                 z-index: 10000;
                 font-size: 14px;
-                box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+                box-shadow: 0 4px 16px rgba(0,0,0,0.3);
                 animation: slideInDown 0.3s ease;
             `;
             notification.textContent = message;
             
-            // Add animation keyframes if not exists
-            if (!document.querySelector('#notification-styles')) {
-                const style = document.createElement('style');
-                style.id = 'notification-styles';
-                style.textContent = `
-                    @keyframes slideInDown {
-                        from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
-                        to { transform: translateX(-50%) translateY(0); opacity: 1; }
-                    }
-                    @keyframes slideOutUp {
-                        from { transform: translateX(-50%) translateY(0); opacity: 1; }
-                        to { transform: translateX(-50%) translateY(-100%); opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-            
             document.body.appendChild(notification);
             
-            // Remove notification after 3 seconds
+            // Remove after 3 seconds
             setTimeout(() => {
                 notification.style.animation = 'slideOutUp 0.3s ease';
                 setTimeout(() => {
@@ -892,308 +1104,152 @@
             }, 3000);
         }
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
+        // Real-time traffic simulation
+        function simulateTrafficUpdates() {
+            if (!showTraffic) return;
+            
+            setInterval(() => {
+                if (showTraffic) {
+                    // Remove existing traffic lines
+                    map.eachLayer(function(layer) {
+                        if (layer instanceof L.Polyline && layer.options.className === 'traffic-line') {
+                            map.removeLayer(layer);
+                        }
+                    });
+                    
+                    // Add updated traffic
+                    addTrafficLayer();
+                }
+            }, 10000); // Update every 10 seconds
         }
 
-        // Route calculation and display
-        function calculateRoute() {
-            const fromInput = document.getElementById('fromInput').value;
-            const toInput = document.getElementById('toInput').value;
-            
-            if (!fromInput.trim() || !toInput.trim()) {
-                showNotification('Please enter both start and destination locations');
-                return;
+        // Add some keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'f':
+                        e.preventDefault();
+                        document.getElementById('searchInput').focus();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        document.getElementById('startInput').focus();
+                        break;
+                }
             }
             
-            showNotification('Calculating best route...');
-            
-            // Simulate route calculation
-            setTimeout(() => {
-                const routeInfo = {
-                    distance: '5.2 km',
-                    duration: currentTransportMode === 'car' ? '12 min' : 
-                             currentTransportMode === 'bike' ? '18 min' : '45 min',
-                    traffic: 'Light traffic on route'
-                };
-                
-                displayRouteInfo(routeInfo);
-                updateRouteVisualization();
-            }, 2000);
-        }
-
-        function displayRouteInfo(routeInfo) {
-            const routeDisplay = document.createElement('div');
-            routeDisplay.style.cssText = `
-                position: absolute;
-                bottom: 100px;
-                right: 30px;
-                background: white;
-                padding: 20px;
-                border-radius: 15px;
-                box-shadow: 0 5px 25px rgba(0,0,0,0.2);
-                z-index: 1000;
-                min-width: 200px;
-            `;
-            
-            routeDisplay.innerHTML = `
-                <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">Route Information</h3>
-                <p style="margin: 5px 0; color: #666; font-size: 14px;">📏 Distance: ${routeInfo.distance}</p>
-                <p style="margin: 5px 0; color: #666; font-size: 14px;">⏱️ Duration: ${routeInfo.duration}</p>
-                <p style="margin: 5px 0; color: #666; font-size: 14px;">🚦 ${routeInfo.traffic}</p>
-                <button onclick="this.parentNode.remove()" style="
-                    position: absolute;
-                    top: 10px;
-                    right: 10px;
-                    background: none;
-                    border: none;
-                    font-size: 18px;
-                    cursor: pointer;
-                    color: #999;
-                ">×</button>
-            `;
-            
-            // Remove existing route info
-            const existing = document.querySelector('.route-info');
-            if (existing) existing.remove();
-            
-            routeDisplay.className = 'route-info';
-            document.querySelector('.map-container').appendChild(routeDisplay);
-        }
-
-        function updateRouteVisualization() {
-            // Remove existing route
-            document.querySelectorAll('.route-line').forEach(el => el.remove());
-            
-            // Create new route based on current settings
-            const mapOverlay = document.getElementById('mapOverlay');
-            createRouteLine(mapOverlay);
-        }
-
-        // Real-time location simulation
-        function simulateLocationUpdates() {
-            if (!isNavigating) return;
-            
-            // Simulate GPS updates every 2 seconds
-            setInterval(() => {
+            if (e.key === 'Escape') {
                 if (isNavigating) {
-                    const currentLocationMarker = document.querySelector('.marker.start');
-                    if (currentLocationMarker) {
-                        // Simulate movement along route
-                        const currentX = parseInt(currentLocationMarker.style.left);
-                        const currentY = parseInt(currentLocationMarker.style.top);
-                        
-                        // Move marker slightly along route
-                        currentLocationMarker.style.left = (currentX + Math.random() * 4 - 2) + 'px';
-                        currentLocationMarker.style.top = (currentY + Math.random() * 4 - 2) + 'px';
-                    }
+                    stopNavigation();
                 }
-            }, 2000);
-        }
-
-        // Traffic incidents simulation
-        function generateTrafficIncidents() {
-            const incidents = [
-                'Road construction on Oak Avenue',
-                'Accident reported on Main Street',
-                'Heavy traffic due to event',
-                'Lane closure on Highway 101',
-                'Traffic signal malfunction'
-            ];
-            
-            setInterval(() => {
-                if (features.alerts && Math.random() < 0.3) {
-                    const randomIncident = incidents[Math.floor(Math.random() * incidents.length)];
-                    showNotification('🚨 ' + randomIncident);
-                }
-            }, 15000);
-        }
-
-        // Weather integration simulation
-        function updateWeatherConditions() {
-            const weatherConditions = [
-                { condition: 'Clear', icon: '☀️', impact: 'Normal driving conditions' },
-                { condition: 'Rain', icon: '🌧️', impact: 'Reduced visibility, drive carefully' },
-                { condition: 'Snow', icon: '❄️', impact: 'Icy roads, increased travel time' },
-                { condition: 'Fog', icon: '🌫️', impact: 'Poor visibility conditions' }
-            ];
-            
-            const randomWeather = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-            
-            // Create weather widget
-            let weatherWidget = document.querySelector('.weather-widget');
-            if (!weatherWidget) {
-                weatherWidget = document.createElement('div');
-                weatherWidget.className = 'weather-widget';
-                weatherWidget.style.cssText = `
-                    position: absolute;
-                    top: 100px;
-                    right: 20px;
-                    background: rgba(255,255,255,0.95);
-                    padding: 15px;
-                    border-radius: 10px;
-                    box-shadow: 0 3px 15px rgba(0,0,0,0.1);
-                    z-index: 1000;
-                    font-size: 14px;
-                    backdrop-filter: blur(10px);
-                `;
-                document.querySelector('.map-container').appendChild(weatherWidget);
+                document.getElementById('searchResults').style.display = 'none';
             }
-            
-            weatherWidget.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 20px;">${randomWeather.icon}</span>
-                    <div>
-                        <div style="font-weight: bold; color: #333;">${randomWeather.condition}</div>
-                        <div style="color: #666; font-size: 12px;">${randomWeather.impact}</div>
-                    </div>
-                </div>
-            `;
-        }
+        });
 
-        // Points of Interest management
-        function addPOI(type, x, y, label) {
-            const mapOverlay = document.getElementById('mapOverlay');
-            const poi = document.createElement('div');
-            
-            const poiIcons = {
-                restaurant: '🍽️',
-                gas: '⛽',
-                hotel: '🏨',
-                hospital: '🏥',
-                shop: '🛍️',
-                park: '🌳'
-            };
-            
-            poi.style.cssText = `
-                position: absolute;
-                left: ${x}px;
-                top: ${y}px;
-                width: 25px;
-                height: 25px;
-                background: white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                cursor: pointer;
-                z-index: 150;
-                transition: all 0.3s ease;
-            `;
-            
-            poi.innerHTML = poiIcons[type] || '📍';
-            poi.title = label;
-            poi.onclick = () => showPOIDetails(type, label, x, y);
-            
-            poi.addEventListener('mouseenter', () => {
-                poi.style.transform = 'scale(1.2)';
-                poi.style.zIndex = '200';
-            });
-            
-            poi.addEventListener('mouseleave', () => {
-                poi.style.transform = 'scale(1)';
-                poi.style.zIndex = '150';
-            });
-            
-            mapOverlay.appendChild(poi);
-        }
+        // Add route input handlers
+        document.getElementById('startInput').addEventListener('input', function() {
+            if (this.value && document.getElementById('endInput').value) {
+                setTimeout(calculateRoute, 500);
+            }
+        });
 
-        function showPOIDetails(type, label, x, y) {
-            const details = document.createElement('div');
-            details.style.cssText = `
-                position: absolute;
-                left: ${x + 30}px;
-                top: ${y - 20}px;
-                background: white;
-                padding: 15px;
-                border-radius: 10px;
-                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                z-index: 1000;
-                min-width: 200px;
-                max-width: 300px;
-            `;
-            
-            const poiInfo = {
-                restaurant: { rating: '4.5⭐', hours: 'Open until 10 PM', phone: '+1 234-567-8900' },
-                gas: { price: '$3.45/gal', hours: '24/7', services: 'Car wash available' },
-                hotel: { rating: '4.2⭐', price: '$120/night', amenities: 'Pool, WiFi, Parking' }
-            };
-            
-            const info = poiInfo[type] || { rating: '4.0⭐', hours: 'Open now' };
-            
-            details.innerHTML = `
-                <div style="font-weight: bold; color: #333; margin-bottom: 10px; font-size: 16px;">${label}</div>
-                ${Object.entries(info).map(([key, value]) => 
-                    `<div style="margin: 5px 0; color: #666; font-size: 14px;">${key}: ${value}</div>`
-                ).join('')}
-                <div style="margin-top: 10px; display: flex; gap: 10px;">
-                    <button onclick="addToRoute('${label}')" style="
-                        background: #4CAF50;
-                        color: white;
-                        border: none;
-                        padding: 8px 15px;
-                        border-radius: 20px;
-                        cursor: pointer;
-                        font-size: 12px;
-                    ">Add to Route</button>
-                    <button onclick="this.parentNode.parentNode.remove()" style="
-                        background: #f44336;
-                        color: white;
-                        border: none;
-                        padding: 8px 15px;
-                        border-radius: 20px;
-                        cursor: pointer;
-                        font-size: 12px;
-                    ">Close</button>
-                </div>
-            `;
-            
-            // Remove existing POI details
-            document.querySelectorAll('.poi-details').forEach(el => el.remove());
-            details.className = 'poi-details';
-            
-            document.getElementById('mapOverlay').appendChild(details);
-        }
+        document.getElementById('endInput').addEventListener('input', function() {
+            if (this.value && document.getElementById('startInput').value) {
+                setTimeout(calculateRoute, 500);
+            }
+        });
 
-        function addToRoute(poiLabel) {
-            document.getElementById('toInput').value = poiLabel;
-            showNotification(`Added ${poiLabel} to route`);
-            document.querySelectorAll('.poi-details').forEach(el => el.remove());
+        // Simulate GPS tracking during navigation
+        function simulateGPSTracking() {
+            if (!isNavigating || !routeLayer) return;
+            
+            // Simulate movement along route
+            const routeCoords = routeLayer.getLatLngs();
+            let currentIndex = 0;
+            
+            const trackingInterval = setInterval(() => {
+                if (!isNavigating || currentIndex >= routeCoords.length) {
+                    clearInterval(trackingInterval);
+                    return;
+                }
+                
+                if (userLocationMarker) {
+                    userLocationMarker.setLatLng(routeCoords[currentIndex]);
+                    map.panTo(routeCoords[currentIndex]);
+                }
+                
+                currentIndex++;
+            }, 2000);
         }
 
         // Initialize everything when page loads
-        window.addEventListener('load', () => {
+        window.addEventListener('load', function() {
             initMap();
-            simulateLocationUpdates();
-            generateTrafficIncidents();
-            updateWeatherConditions();
+            simulateTrafficUpdates();
             
-            // Add some sample POIs
-            addPOI('restaurant', 180, 95, 'Pizza Palace');
-            addPOI('gas', 280, 45, 'Shell Station');
-            addPOI('hotel', 340, 160, 'Grand Hotel');
-            addPOI('hospital', 120, 180, 'City Hospital');
-            
-            // Update weather every 30 seconds
-            setInterval(updateWeatherConditions, 30000);
-            
-            // Auto-calculate route when inputs change
-            document.getElementById('toInput').addEventListener('input', () => {
-                if (document.getElementById('toInput').value.trim()) {
-                    setTimeout(calculateRoute, 1000);
+            // Start GPS simulation when navigation starts
+            const originalStartNavigation = startNavigation;
+            startNavigation = function() {
+                originalStartNavigation();
+                if (isNavigating) {
+                    simulateGPSTracking();
                 }
-            });
-            
-            // Enter key support for search
-            document.getElementById('searchInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    search();
-                }
-            });
+            };
         });
+
+        // Add some sample events
+        setTimeout(() => {
+            if (Math.random() > 0.7) {
+                showNotification('🚨 Traffic incident detected on your route');
+            }
+        }, 15000);
+
+        setTimeout(() => {
+            if (Math.random() > 0.8) {
+                showNotification('⛽ Gas station nearby - Chevron (0.2 mi)');
+            }
+        }, 25000);
+
+        // Add click handlers for route inputs
+        document.getElementById('startInput').addEventListener('click', function() {
+            if (this.value === 'Your location' || this.value === '') {
+                getUserLocation();
+            }
+        });
+
+        // Add Enter key support for inputs
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const firstResult = document.querySelector('.search-result-item');
+                if (firstResult) {
+                    firstResult.click();
+                }
+            }
+        });
+
+        // Simulate real-time location sharing
+        function enableLocationSharing() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    function(position) {
+                        if (userLocationMarker) {
+                            userLocationMarker.setLatLng([position.coords.latitude, position.coords.longitude]);
+                        }
+                    },
+                    function(error) {
+                        console.log('Location tracking error:', error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 30000,
+                        timeout: 27000
+                    }
+                );
+            }
+        }
+
+        // Enable location tracking
+        setTimeout(enableLocationSharing, 2000);
     </script>
 </body>
 </html>
