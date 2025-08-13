@@ -3,341 +3,149 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Maps – Real‑time Demo (OSM + MapLibre)</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.10/dist/tailwind.min.css" rel="stylesheet" />
+  <title>Maps – Real-time Demo</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MapLibre CSS -->
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     html, body, #app { height: 100%; margin: 0; }
     #map { position: absolute; inset: 0; }
-    .floating-card { backdrop-filter: blur(10px); background: rgba(255,255,255,0.85); box-shadow: 0 10px 30px rgba(0,0,0,.15); }
-    .dark .floating-card { background: rgba(24,24,27,0.8); color: #e5e7eb; }
-    .mapboxgl-ctrl, .maplibregl-ctrl { font: inherit; }
-    .marker-pulse { width: 16px; height: 16px; background: #10b981; border-radius: 9999px; position: relative; box-shadow: 0 0 0 rgba(16,185,129,0.7); animation: pulse 2s infinite; border: 2px solid white; }
-    .marker-pulse.user { background: #3b82f6; box-shadow: 0 0 0 rgba(59,130,246,0.7); }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7);} 70% { box-shadow: 0 0 0 20px rgba(16,185,129,0);} 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0);} }
-    .switch input:checked + span { transform: translateX(1.25rem); }
+    .floating-card {
+      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,0.85);
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      border-radius: 1rem;
+      padding: 1rem;
+    }
+    .dark .floating-card {
+      background: rgba(24,24,27,0.8);
+      color: #e5e7eb;
+    }
+    .marker-pulse {
+      width: 16px;
+      height: 16px;
+      background: #10b981;
+      border-radius: 9999px;
+      position: relative;
+      box-shadow: 0 0 0 rgba(16,185,129,0.7);
+      animation: pulse 2s infinite;
+      border: 2px solid white;
+    }
+    .marker-pulse.user {
+      background: #3b82f6;
+      box-shadow: 0 0 0 rgba(59,130,246,0.7);
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7);}
+      70% { box-shadow: 0 0 0 20px rgba(16,185,129,0);}
+      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0);}
+    }
   </style>
 </head>
 <body class="bg-zinc-50 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
   <div id="app">
     <div id="map"></div>
 
-    <!-- Top Bar -->
-    <div class="floating-card fixed top-3 left-1/2 -translate-x-1/2 w-[min(900px,92vw)] rounded-2xl p-3">
-      <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+    <!-- Top Search & Controls -->
+    <div class="floating-card fixed top-3 left-1/2 -translate-x-1/2 w-[min(900px,92vw)]">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center">
         <div class="flex-1">
-          <input id="search" class="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white/70 dark:bg-zinc-800/70 px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Search places, addresses (OpenStreetMap / Photon)" />
-          <div id="suggestions" class="mt-2 hidden absolute z-20 w-[min(900px,92vw)] max-h-72 overflow-auto rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"></div>
+          <input id="search" class="w-full rounded-xl border px-4 py-2 bg-white/70 dark:bg-zinc-800/70 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Search places" />
+          <div id="suggestions" class="mt-2 hidden absolute z-20 w-[min(900px,92vw)] max-h-72 overflow-auto rounded-xl border bg-white dark:bg-zinc-800"></div>
         </div>
         <div class="flex items-center gap-2">
-          <button id="btn-locate" class="rounded-xl px-3 py-2 bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95">Locate me</button>
-          <button id="btn-route" class="rounded-xl px-3 py-2 bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900">Directions</button>
+          <button id="btn-locate" class="rounded-xl px-3 py-2 bg-emerald-500 text-white">Locate me</button>
+          <button id="btn-route" class="rounded-xl px-3 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">Directions</button>
           <label class="inline-flex items-center gap-2 text-sm select-none">
             <span>Dark</span>
-            <span class="relative inline-flex h-6 w-11 rounded-full bg-zinc-300 dark:bg-zinc-700"><input id="dark-toggle" type="checkbox" class="sr-only" /><span class="switch absolute left-0 top-0 h-6 w-6 rounded-full bg-white dark:bg-zinc-900 transition-transform"></span></span>
+            <input id="dark-toggle" type="checkbox" class="toggle" />
           </label>
         </div>
       </div>
     </div>
 
-    <!-- Left Drawer -->
-    <div id="drawer" class="floating-card fixed left-3 top-24 bottom-3 w-[min(380px,90vw)] rounded-2xl p-4 overflow-y-auto">
-      <h2 class="text-lg font-semibold">Layers & Tools</h2>
-      <div class="mt-3 space-y-3">
-        <div>
-          <p class="text-sm font-medium mb-1">Base map</p>
-          <select id="basemap" class="w-full rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70">
-            <option value="osm">OpenStreetMap</option>
-            <option value="opentopo">OpenTopoMap</option>
-          </select>
-        </div>
-
-        <div class="border-t dark:border-zinc-700 pt-3">
-          <p class="text-sm font-medium mb-1">Real‑time layer</p>
-          <div class="flex items-center justify-between">
-            <span class="text-sm">Connect Socket.IO</span>
-            <input id="socket-url" class="ml-2 flex-1 rounded-xl border px-3 py-1 text-sm bg-white/70 dark:bg-zinc-800/70" placeholder="https://your-backend.onrender.com" />
-          </div>
-          <div class="mt-2 flex gap-2">
-            <button id="btn-connect" class="rounded-xl px-3 py-2 bg-emerald-500 text-white">Connect</button>
-            <button id="btn-sim" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Simulate</button>
-            <button id="btn-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Clear</button>
-          </div>
-          <p class="text-xs text-zinc-500 mt-1">Expected events: <code>vehicle:update</code> {id, lat, lon, heading?, speed?}</p>
-        </div>
-
-        <div class="border-t dark:border-zinc-700 pt-3">
-          <p class="text-sm font-medium mb-1">Measure</p>
-          <div class="flex gap-2">
-            <button id="btn-measure" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Distance</button>
-            <button id="btn-measure-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Reset</button>
-          </div>
-          <p id="measure-output" class="text-sm mt-2"></p>
-        </div>
-
-        <div class="border-t dark:border-zinc-700 pt-3">
-          <p class="text-sm font-medium mb-1">Route (OSRM)</p>
-          <input id="route-from" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="From: place or lat,lon" />
-          <input id="route-to" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="To: place or lat,lon" />
-          <button id="btn-go" class="rounded-xl px-3 py-2 bg-indigo-600 text-white w-full">Get Directions</button>
-          <div id="route-panel" class="text-sm mt-2 space-y-1"></div>
-        </div>
+    <!-- Side Drawer -->
+    <div id="drawer" class="floating-card fixed left-3 top-24 bottom-3 w-[min(380px,90vw)] overflow-y-auto">
+      <h2 class="text-lg font-semibold mb-3">Layers & Tools</h2>
+      <div>
+        <label class="text-sm font-medium">Base map</label>
+        <select id="basemap" class="w-full rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70">
+          <option value="osm">OpenStreetMap</option>
+          <option value="opentopo">OpenTopoMap</option>
+        </select>
       </div>
-      <p class="text-xs text-zinc-500 mt-4">Tiles: © OpenStreetMap contributors. Routing: OSRM. Search: Photon.</p>
+
+      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
+
+      <div>
+        <label class="text-sm font-medium">Real-time layer</label>
+        <input id="socket-url" class="w-full rounded-xl border px-3 py-2 mt-1 bg-white/70 dark:bg-zinc-800/70" placeholder="https://your-backend.onrender.com" />
+        <div class="flex gap-2 mt-2">
+          <button id="btn-connect" class="rounded-xl px-3 py-2 bg-emerald-500 text-white">Connect</button>
+          <button id="btn-sim" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Simulate</button>
+          <button id="btn-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Clear</button>
+        </div>
+        <p class="text-xs text-zinc-500 mt-1">Expected events: <code>vehicle:update</code> {id, lat, lon}</p>
+      </div>
+
+      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
+
+      <div>
+        <label class="text-sm font-medium">Measure</label>
+        <div class="flex gap-2 mt-1">
+          <button id="btn-measure" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Distance</button>
+          <button id="btn-measure-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Reset</button>
+        </div>
+        <p id="measure-output" class="text-sm mt-2"></p>
+      </div>
+
+      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
+
+      <div>
+        <label class="text-sm font-medium">Route (OSRM)</label>
+        <input id="route-from" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="From: place or lat,lon" />
+        <input id="route-to" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="To: place or lat,lon" />
+        <button id="btn-go" class="rounded-xl px-3 py-2 bg-indigo-600 text-white w-full">Get Directions</button>
+        <div id="route-panel" class="text-sm mt-2 space-y-1"></div>
+      </div>
     </div>
 
-    <!-- Right FABs -->
+    <!-- Floating Zoom Controls -->
     <div class="fixed right-3 bottom-3 flex flex-col gap-2">
-      <button id="btn-zoom-in" class="floating-card rounded-2xl p-3">＋</button>
-      <button id="btn-zoom-out" class="floating-card rounded-2xl p-3">－</button>
-      <button id="btn-reset" class="floating-card rounded-2xl p-3">⟳</button>
+      <button id="btn-zoom-in" class="floating-card p-3">＋</button>
+      <button id="btn-zoom-out" class="floating-card p-3">－</button>
+      <button id="btn-reset" class="floating-card p-3">⟳</button>
     </div>
   </div>
 
+  <!-- Scripts -->
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script>
-    // --- Theme ---
-    const themeToggle = document.getElementById('dark-toggle');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && prefersDark)) document.documentElement.classList.add('dark');
-    themeToggle.checked = document.documentElement.classList.contains('dark');
-    themeToggle.addEventListener('change', () => {
-      document.documentElement.classList.toggle('dark');
-      localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    });
-
-    // --- Map setup (MapLibre + OSM raster) ---
+    // Map init
     const map = new maplibregl.Map({
       container: 'map',
       style: {
         version: 8,
         sources: {
-          'osm-raster': { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap' },
-          'opentopo': { type: 'raster', tiles: ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png','https://b.tile.opentopomap.org/{z}/{x}/{y}.png','https://c.tile.opentopomap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenTopoMap, © OSM' }
+          'osm': { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 },
+          'opentopo': { type: 'raster', tiles: ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png'], tileSize: 256 }
         },
         layers: [
-          { id: 'osm-raster', type: 'raster', source: 'osm-raster', layout: { visibility: 'visible' } },
+          { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'visible' } },
           { id: 'opentopo', type: 'raster', source: 'opentopo', layout: { visibility: 'none' } }
         ]
       },
-      center: [77.5946, 12.9716], // Bengaluru default
-      zoom: 12,
-      attributionControl: true,
+      center: [77.5946, 12.9716],
+      zoom: 12
     });
 
-    // Controls
-    map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }));
-
-    // Base map switcher
+    // Basemap switch
     document.getElementById('basemap').addEventListener('change', (e) => {
-      const v = e.target.value;
-      map.setLayoutProperty('osm-raster', 'visibility', v === 'osm' ? 'visible' : 'none');
-      map.setLayoutProperty('opentopo', 'visibility', v === 'opentopo' ? 'visible' : 'none');
-    });
-
-    // Simple helper
-    function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
-
-    // --- Geolocation (real-time) ---
-    let userMarker, accuracyCircle;
-    const locateBtn = document.getElementById('btn-locate');
-    let geoWatchId = null;
-    locateBtn.addEventListener('click', () => {
-      if (!navigator.geolocation) return alert('Geolocation not supported');
-      if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; try { userMarker.remove(); accuracyCircle.remove(); } catch(e){} locateBtn.textContent = 'Locate me'; return; }
-      geoWatchId = navigator.geolocation.watchPosition(pos => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        const lngLat = [longitude, latitude];
-        if (!userMarker) {
-          userMarker = new maplibregl.Marker({ element: el('<div class="marker-pulse user"></div>') }).setLngLat(lngLat).addTo(map);
-        } else userMarker.setLngLat(lngLat);
-        // accuracy circle via geojson layer
-        const id = 'user-accuracy';
-        const sourceData = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: lngLat } }] };
-        const circle = turf.circle(lngLat, accuracy / 1000, { steps: 64, units: 'kilometers' });
-        if (!map.getSource(id)) {
-          map.addSource(id, { type: 'geojson', data: circle });
-          map.addLayer({ id, type: 'fill', source: id, paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.15 } });
-        } else {
-          map.getSource(id).setData(circle);
-        }
-        if (!map.getBounds().contains(lngLat)) map.easeTo({ center: lngLat, zoom: 15 });
-        locateBtn.textContent = 'Stop locating';
-      }, err => alert(err.message), { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
-    });
-
-    // Turf.js for geometry helpers (circle, length)
-    const turfScript = document.createElement('script');
-    turfScript.src = 'https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js';
-    document.head.appendChild(turfScript);
-
-    // --- Search (Photon by Komoot) ---
-    const search = document.getElementById('search');
-    const suggestBox = document.getElementById('suggestions');
-    let suggestTimer;
-    search.addEventListener('input', () => {
-      const q = search.value.trim();
-      clearTimeout(suggestTimer);
-      if (!q) { suggestBox.classList.add('hidden'); suggestBox.innerHTML=''; return; }
-      suggestTimer = setTimeout(async () => {
-        try {
-          const url = new URL('https://photon.komoot.io/api/');
-          url.searchParams.set('q', q);
-          url.searchParams.set('limit', '8');
-          const res = await fetch(url);
-          const data = await res.json();
-          suggestBox.innerHTML = '';
-          data.features.forEach(f => {
-            const name = (f.properties.name || 'Unnamed');
-            const ctx = [f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', ');
-            const item = el(`<div class="p-3 hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer">${name}<div class="text-xs text-zinc-500">${ctx}</div></div>`);
-            item.addEventListener('click', () => {
-              const [lon, lat] = f.geometry.coordinates;
-              map.easeTo({ center: [lon, lat], zoom: 15 });
-              new maplibregl.Popup().setLngLat([lon, lat]).setHTML(`<div class='text-sm'><strong>${name}</strong><div>${ctx}</div></div>`).addTo(map);
-              suggestBox.classList.add('hidden');
-            });
-            suggestBox.appendChild(item);
-          });
-          suggestBox.classList.toggle('hidden', data.features.length === 0);
-        } catch (e) { /* ignore */ }
-      }, 250);
-    });
-    document.addEventListener('click', (e) => { if (!suggestBox.contains(e.target) && e.target !== search) suggestBox.classList.add('hidden'); });
-
-    // --- Directions (OSRM demo server) ---
-    const routeLineId = 'route-line';
-    async function geocodeAny(text){
-      // Accept "lat,lon"
-      const pair = text.split(',').map(s=>parseFloat(s.trim()));
-      if (pair.length===2 && pair.every(n=>!Number.isNaN(n))) return [pair[1], pair[0]]; // return [lon,lat]
-      const url = new URL('https://photon.komoot.io/api/'); url.searchParams.set('q', text); url.searchParams.set('limit','1');
-      const j = await (await fetch(url)).json();
-      if (j.features && j.features[0]) return j.features[0].geometry.coordinates;
-      throw new Error('Place not found');
-    }
-    async function route(fromText, toText){
-      const [fromLon, fromLat] = await geocodeAny(fromText);
-      const [toLon, toLat] = await geocodeAny(toText);
-      const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
-      const data = await (await fetch(url)).json();
-      if (!data.routes || !data.routes[0]) throw new Error('No route');
-      const r = data.routes[0];
-      const geo = { type:'Feature', properties:{}, geometry:r.geometry };
-      if (!map.getSource('route')) { map.addSource('route', { type:'geojson', data: geo }); map.addLayer({ id:routeLineId, type:'line', source:'route', paint:{ 'line-color':'#4f46e5','line-width':5,'line-opacity':0.8 } }); }
-      else map.getSource('route').setData(geo);
-      map.fitBounds([[fromLon, fromLat],[toLon, toLat]], { padding: 60, linear:false });
-      // Panel
-      const km = (r.distance/1000).toFixed(1); const min = Math.round(r.duration/60);
-      document.getElementById('route-panel').innerHTML = `<div><strong>${km} km</strong>, ~${min} min</div>`;
-      // Simple step list
-      const steps = r.legs[0].steps.map(s=>`<li>${s.maneuver.instruction || s.name || ''}</li>`).join('');
-      document.getElementById('route-panel').innerHTML += `<ol class='list-decimal ml-5 space-y-1'>${steps}</ol>`;
-    }
-
-    document.getElementById('btn-route').addEventListener('click', ()=>{
-      document.getElementById('drawer').scrollTo({top:0,behavior:'smooth'});
-      document.getElementById('route-from').focus();
-    });
-    document.getElementById('btn-go').addEventListener('click', ()=>{
-      route(document.getElementById('route-from').value, document.getElementById('route-to').value).catch(e=>alert(e.message));
-    });
-
-    // --- Measure distance tool ---
-    const measureBtn = document.getElementById('btn-measure');
-    const measureResetBtn = document.getElementById('btn-measure-clear');
-    const measureOut = document.getElementById('measure-output');
-    let measureOn = false; let measurePoints = [];
-    measureBtn.addEventListener('click',()=>{ measureOn = !measureOn; measureBtn.classList.toggle('bg-emerald-500'); measureBtn.classList.toggle('text-white'); if (!measureOn) { clearMeasure(); }});
-    measureResetBtn.addEventListener('click', clearMeasure);
-    function clearMeasure(){ measurePoints = []; measureOut.textContent=''; if (map.getSource('measure')) map.removeLayer('measure'), map.removeSource('measure'); }
-    map.on('click', (e)=>{
-      if (!measureOn || !window.turf) return;
-      measurePoints.push([e.lngLat.lng, e.lngLat.lat]);
-      const fc = { type:'FeatureCollection', features:[ { type:'Feature', geometry:{ type:'LineString', coordinates: measurePoints } } ] };
-      if (!map.getSource('measure')) { map.addSource('measure',{ type:'geojson', data: fc }); map.addLayer({ id:'measure', type:'line', source:'measure', paint:{ 'line-color':'#10b981','line-width':4,'line-dasharray':[2,2] } }); }
-      else map.getSource('measure').setData(fc);
-      if (measurePoints.length>1){ const km = turf.length(fc.features[0], {units:'kilometers'}); measureOut.textContent = `Distance: ${km.toFixed(2)} km`; }
-    });
-
-    // --- Right FABs ---
-    document.getElementById('btn-zoom-in').onclick = ()=> map.zoomTo(map.getZoom()+1, { duration: 200 });
-    document.getElementById('btn-zoom-out').onclick = ()=> map.zoomTo(map.getZoom()-1, { duration: 200 });
-    document.getElementById('btn-reset').onclick = ()=> map.easeTo({ center: [77.5946,12.9716], zoom: 12 });
-
-    // --- Real-time markers (Socket.IO + clustering) ---
-    const liveSourceId = 'live';
-    let liveData = { type:'FeatureCollection', features: [] };
-    function ensureLiveSource(){
-      if (!map.getSource(liveSourceId)){
-        map.addSource(liveSourceId, { type:'geojson', data: liveData, cluster: true, clusterRadius: 60 });
-        map.addLayer({ id:'cluster', type:'circle', source: liveSourceId, filter:['has','point_count'], paint:{ 'circle-color':'#10b981','circle-radius':['step',['get','point_count'],14, 20, 18, 50, 24], 'circle-opacity':0.75 } });
-        map.addLayer({ id:'cluster-count', type:'symbol', source: liveSourceId, filter:['has','point_count'], layout:{ 'text-field':['get','point_count_abbreviated'], 'text-size':12 } });
-        map.addLayer({ id:'unclustered', type:'symbol', source: liveSourceId, filter:['!',['has','point_count']], layout:{ 'icon-image':'marker-15', 'icon-size':1, 'text-offset':[0,1], 'text-field':['get','label'], 'text-size':11 } });
-      } else {
-        map.getSource(liveSourceId).setData(liveData);
-      }
-    }
-    function upsertVehicle(v){
-      const i = liveData.features.findIndex(f=>f.properties && f.properties.id===v.id);
-      const feat = { type:'Feature', properties:{ id:v.id, label: v.label || `#${v.id}`, speed: v.speed||0 }, geometry:{ type:'Point', coordinates:[v.lon, v.lat] } };
-      if (i>=0) liveData.features[i] = feat; else liveData.features.push(feat);
-      ensureLiveSource();
-    }
-    function clearLive(){ liveData.features = []; if (map.getSource(liveSourceId)) map.getSource(liveSourceId).setData(liveData); }
-
-    // Socket connect + simulate
-    let socket = null;
-    document.getElementById('btn-connect').addEventListener('click', ()=>{
-      const url = document.getElementById('socket-url').value.trim();
-      if (!url) return alert('Enter Socket.IO server URL');
-      try { socket?.disconnect(); } catch(e){}
-      socket = io(url, { transports:['websocket'] });
-      socket.on('connect', ()=> console.log('socket connected'));
-      socket.on('vehicle:update', payload => {
-        // Expect {id, lat, lon, heading?, speed?}
-        if (payload && typeof payload.lat==='number' && typeof payload.lon==='number' && payload.id!=null) upsertVehicle(payload);
-      });
-      socket.on('disconnect', ()=> console.log('socket disconnected'));
-    });
-    document.getElementById('btn-clear').addEventListener('click', clearLive);
-
-    // Simple simulator
-    let simTimer;
-    document.getElementById('btn-sim').addEventListener('click', ()=>{
-      clearInterval(simTimer);
-      clearLive();
-      // Seed around current center
-      const c = map.getCenter();
-      const N = 50; const arr = Array.from({length:N}, (_,i)=>({ id:i+1, lat:c.lat + (Math.random()-0.5)*0.1, lon:c.lng + (Math.random()-0.5)*0.1, speed: Math.random()*40 }));
-      arr.forEach(upsertVehicle);
-      simTimer = setInterval(()=>{
-        arr.forEach(v=>{ v.lat += (Math.random()-0.5)*0.001; v.lon += (Math.random()-0.5)*0.001; upsertVehicle(v); });
-      }, 1000);
-    });
-
-    // --- Click for reverse geocode ---
-    map.on('click', async (e)=>{
-      try {
-        const url = new URL('https://nominatim.openstreetmap.org/reverse');
-        url.searchParams.set('format','jsonv2');
-        url.searchParams.set('lat', e.lngLat.lat);
-        url.searchParams.set('lon', e.lngLat.lng);
-        const j = await (await fetch(url, { headers: { 'Accept-Language': 'en' } })).json();
-        const display = j.display_name || `${e.lngLat.lat.toFixed(5)}, ${e.lngLat.lng.toFixed(5)}`;
-        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<div class='text-sm'>${display}</div>`).addTo(map);
-      } catch { /* silent */ }
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e)=>{
-      if (e.key==='l') locateBtn.click();
-      if (e.key==='+') document.getElementById('btn-zoom-in').click();
-      if (e.key==='-') document.getElementById('btn-zoom-out').click();
-      if (e.key==='r') document.getElementById('btn-reset').click();
+      map.setLayoutProperty('osm', 'visibility', e.target.value === 'osm' ? 'visible' : 'none');
+      map.setLayoutProperty('opentopo', 'visibility', e.target.value === 'opentopo' ? 'visible' : 'none');
     });
   </script>
 </body>
