@@ -1,151 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Maps – Real-time Demo</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- MapLibre CSS -->
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Map App</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+  />
   <style>
-    html, body, #app { height: 100%; margin: 0; }
-    #map { position: absolute; inset: 0; }
-    .floating-card {
-      backdrop-filter: blur(10px);
-      background: rgba(255,255,255,0.85);
-      box-shadow: 0 10px 30px rgba(0,0,0,.15);
-      border-radius: 1rem;
-      padding: 1rem;
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
     }
-    .dark .floating-card {
-      background: rgba(24,24,27,0.8);
-      color: #e5e7eb;
+    #map {
+      height: 100vh;
+      width: 100%;
     }
-    .marker-pulse {
-      width: 16px;
-      height: 16px;
-      background: #10b981;
-      border-radius: 9999px;
-      position: relative;
-      box-shadow: 0 0 0 rgba(16,185,129,0.7);
-      animation: pulse 2s infinite;
-      border: 2px solid white;
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
-    .marker-pulse.user {
-      background: #3b82f6;
-      box-shadow: 0 0 0 rgba(59,130,246,0.7);
+    input {
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 180px;
     }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7);}
-      70% { box-shadow: 0 0 0 20px rgba(16,185,129,0);}
-      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0);}
+    button {
+      padding: 6px 10px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
     }
   </style>
 </head>
-<body class="bg-zinc-50 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
-  <div id="app">
-    <div id="map"></div>
-
-    <!-- Top Search & Controls -->
-    <div class="floating-card fixed top-3 left-1/2 -translate-x-1/2 w-[min(900px,92vw)]">
-      <div class="flex flex-col gap-2 md:flex-row md:items-center">
-        <div class="flex-1">
-          <input id="search" class="w-full rounded-xl border px-4 py-2 bg-white/70 dark:bg-zinc-800/70 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Search places" />
-          <div id="suggestions" class="mt-2 hidden absolute z-20 w-[min(900px,92vw)] max-h-72 overflow-auto rounded-xl border bg-white dark:bg-zinc-800"></div>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="btn-locate" class="rounded-xl px-3 py-2 bg-emerald-500 text-white">Locate me</button>
-          <button id="btn-route" class="rounded-xl px-3 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">Directions</button>
-          <label class="inline-flex items-center gap-2 text-sm select-none">
-            <span>Dark</span>
-            <input id="dark-toggle" type="checkbox" class="toggle" />
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <!-- Side Drawer -->
-    <div id="drawer" class="floating-card fixed left-3 top-24 bottom-3 w-[min(380px,90vw)] overflow-y-auto">
-      <h2 class="text-lg font-semibold mb-3">Layers & Tools</h2>
-      <div>
-        <label class="text-sm font-medium">Base map</label>
-        <select id="basemap" class="w-full rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70">
-          <option value="osm">OpenStreetMap</option>
-          <option value="opentopo">OpenTopoMap</option>
-        </select>
-      </div>
-
-      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
-
-      <div>
-        <label class="text-sm font-medium">Real-time layer</label>
-        <input id="socket-url" class="w-full rounded-xl border px-3 py-2 mt-1 bg-white/70 dark:bg-zinc-800/70" placeholder="https://your-backend.onrender.com" />
-        <div class="flex gap-2 mt-2">
-          <button id="btn-connect" class="rounded-xl px-3 py-2 bg-emerald-500 text-white">Connect</button>
-          <button id="btn-sim" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Simulate</button>
-          <button id="btn-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Clear</button>
-        </div>
-        <p class="text-xs text-zinc-500 mt-1">Expected events: <code>vehicle:update</code> {id, lat, lon}</p>
-      </div>
-
-      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
-
-      <div>
-        <label class="text-sm font-medium">Measure</label>
-        <div class="flex gap-2 mt-1">
-          <button id="btn-measure" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Distance</button>
-          <button id="btn-measure-clear" class="rounded-xl px-3 py-2 bg-zinc-200 dark:bg-zinc-800">Reset</button>
-        </div>
-        <p id="measure-output" class="text-sm mt-2"></p>
-      </div>
-
-      <hr class="my-3 border-zinc-300 dark:border-zinc-700">
-
-      <div>
-        <label class="text-sm font-medium">Route (OSRM)</label>
-        <input id="route-from" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="From: place or lat,lon" />
-        <input id="route-to" class="w-full mb-2 rounded-xl border px-3 py-2 bg-white/70 dark:bg-zinc-800/70" placeholder="To: place or lat,lon" />
-        <button id="btn-go" class="rounded-xl px-3 py-2 bg-indigo-600 text-white w-full">Get Directions</button>
-        <div id="route-panel" class="text-sm mt-2 space-y-1"></div>
-      </div>
-    </div>
-
-    <!-- Floating Zoom Controls -->
-    <div class="fixed right-3 bottom-3 flex flex-col gap-2">
-      <button id="btn-zoom-in" class="floating-card p-3">＋</button>
-      <button id="btn-zoom-out" class="floating-card p-3">－</button>
-      <button id="btn-reset" class="floating-card p-3">⟳</button>
-    </div>
+<body>
+  <div class="controls">
+    <input type="text" id="from" placeholder="From location" />
+    <input type="text" id="to" placeholder="To location" />
+    <button id="locateMe">📍 Current</button>
+    <button id="getDirections">Get Directions</button>
   </div>
+  <div id="map"></div>
 
-  <!-- Scripts -->
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"
+  />
+
   <script>
-    // Map init
-    const map = new maplibregl.Map({
-      container: 'map',
-      style: {
-        version: 8,
-        sources: {
-          'osm': { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 },
-          'opentopo': { type: 'raster', tiles: ['https://a.tile.opentopomap.org/{z}/{x}/{y}.png'], tileSize: 256 }
-        },
-        layers: [
-          { id: 'osm', type: 'raster', source: 'osm', layout: { visibility: 'visible' } },
-          { id: 'opentopo', type: 'raster', source: 'opentopo', layout: { visibility: 'none' } }
-        ]
-      },
-      center: [77.5946, 12.9716],
-      zoom: 12
+    // Initialize map
+    const map = L.map('map').setView([20.5937, 78.9629], 5); // Default India
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:
+        '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    let routingControl;
+    let currentLocationMarker;
+
+    // Geocoder
+    const geocoder = L.Control.Geocoder.nominatim();
+
+    // Current location
+    document.getElementById('locateMe').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            map.setView([lat, lon], 14);
+
+            if (currentLocationMarker) {
+              map.removeLayer(currentLocationMarker);
+            }
+            currentLocationMarker = L.marker([lat, lon])
+              .addTo(map)
+              .bindPopup('You are here')
+              .openPopup();
+
+            // Fill "from" input
+            geocoder.reverse(
+              { lat: lat, lng: lon },
+              map.options.crs.scale(map.getZoom()),
+              (results) => {
+                if (results && results[0]) {
+                  document.getElementById('from').value = results[0].name;
+                }
+              }
+            );
+          },
+          (err) => alert('Could not get location: ' + err.message)
+        );
+      } else {
+        alert('Geolocation not supported.');
+      }
     });
 
-    // Basemap switch
-    document.getElementById('basemap').addEventListener('change', (e) => {
-      map.setLayoutProperty('osm', 'visibility', e.target.value === 'osm' ? 'visible' : 'none');
-      map.setLayoutProperty('opentopo', 'visibility', e.target.value === 'opentopo' ? 'visible' : 'none');
+    // Get directions
+    document.getElementById('getDirections').addEventListener('click', () => {
+      const from = document.getElementById('from').value;
+      const to = document.getElementById('to').value;
+
+      if (!from || !to) {
+        alert('Please enter both locations');
+        return;
+      }
+
+      geocoder.geocode(from, (fromResults) => {
+        if (!fromResults || fromResults.length === 0) {
+          alert('From location not found');
+          return;
+        }
+        const fromLatLng = fromResults[0].center;
+
+        geocoder.geocode(to, (toResults) => {
+          if (!toResults || toResults.length === 0) {
+            alert('To location not found');
+            return;
+          }
+          const toLatLng = toResults[0].center;
+
+          if (routingControl) {
+            map.removeControl(routingControl);
+          }
+
+          routingControl = L.Routing.control({
+            waypoints: [fromLatLng, toLatLng],
+            routeWhileDragging: true,
+            geocoder: geocoder,
+            show: false,
+            addWaypoints: false
+          }).addTo(map);
+        });
+      });
     });
   </script>
 </body>
