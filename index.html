@@ -1,377 +1,440 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web Map – Directions (OSM)</title>
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    :root {
-      --card-bg: rgba(255,255,255,.92);
-      --shadow: 0 10px 30px rgba(0,0,0,.15);
-      --radius: 14px;
-      --accent: #2563eb; /* blue-600 */
-      --accent-2: #10b981; /* emerald-500 */
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111827; }
-    #map { position: absolute; inset: 0; }
-    .card {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      top: 12px;
-      width: min(980px, 94vw);
-      background: var(--card-bg);
-      backdrop-filter: blur(10px);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 12px;
-      z-index: 1000;
-    }
-    .row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; }
-    .field-wrap { position: relative; }
-    input[type="text"] {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      outline: none;
-      font-size: 14px;
-      background: #fff;
-    }
-    input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
-    button {
-      padding: 10px 12px;
-      border: 0;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 600;
-      background: #111827;
-      color: #fff;
-    }
-    button.secondary { background: #e5e7eb; color: #111827; }
-    button.accent { background: var(--accent); }
-    button.green { background: var(--accent-2); }
-    button:disabled { opacity: .7; cursor: not-allowed; }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web Map – Live Navigation (OSM)</title>
 
-    /* Suggestions dropdown */
-    .suggestions {
-      position: absolute;
-      left: 0; right: 0; top: calc(100% + 6px);
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      max-height: 260px;
-      overflow: auto;
-      z-index: 2000;
-    }
-    .s-item { padding: 10px 12px; cursor: pointer; }
-    .s-item:hover { background: #f3f4f6; }
-    .s-sub { display:block; font-size: 12px; color:#6b7280; margin-top:2px; }
+<!-- Leaflet core -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    /* Side directions panel */
-    .panel {
-      position: fixed;
-      right: 12px;
-      top: 12px;
-      bottom: 12px;
-      width: min(360px, 86vw);
-      background: var(--card-bg);
-      backdrop-filter: blur(10px);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 12px 14px;
-      z-index: 900;
-      overflow: auto;
-    }
-    .muted { color:#6b7280; font-size: 13px; }
-    ol.steps { margin: 8px 0 0 20px; padding: 0; }
-    ol.steps li { margin: 6px 0; line-height: 1.35; }
+<!-- Leaflet Routing Machine (for route + instructions) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
-    /* little badges */
-    .badge {
-      display:inline-block; padding:4px 8px; border-radius:999px;
-      background:#eef2ff; color:#3730a3; font-size:12px; font-weight:700;
-      margin-right:6px;
-    }
-    /* start/end buttons on small screens */
-    @media (max-width: 720px) {
-      .row { grid-template-columns: 1fr; }
-      .card { padding: 10px; }
-    }
-  </style>
+<!-- Minimal styles -->
+<style>
+  :root{
+    --bg: rgba(255,255,255,.95);
+    --shadow: 0 10px 30px rgba(0,0,0,.15);
+    --radius: 14px;
+    --accent: #2563eb; /* blue */
+    --green: #10b981;  /* emerald */
+    --dark: #111827;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827}
+  #map{position:absolute;inset:0}
+
+  /* Top controls */
+  .card{
+    position:fixed; z-index:1000; left:50%; transform:translateX(-50%);
+    top:10px; width:min(980px,94vw);
+    background:var(--bg); backdrop-filter:blur(10px); box-shadow:var(--shadow);
+    border-radius:var(--radius); padding:10px;
+  }
+  .row{display:grid; grid-template-columns:1fr auto auto auto; gap:7px; align-items:center}
+  .row2{display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:6px}
+  .wrap{position:relative}
+  input[type="text"]{
+    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px;
+    font-size:14px; outline:none; background:#fff;
+  }
+  input[type="text"]:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  button{
+    padding:10px 12px; border:0; border-radius:10px; cursor:pointer; font-weight:600;
+    background:var(--dark); color:#fff;
+  }
+  .btn{background:#e5e7eb;color:#111827}
+  .accent{background:var(--accent); color:#fff}
+  .green{background:var(--green); color:#fff}
+  .danger{background:#ef4444; color:#fff}
+  .muted{color:#6b7280; font-size:12px}
+
+  /* Suggestions dropdown */
+  .sug{
+    position:absolute; left:0; right:0; top:calc(100% + 6px);
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:var(--shadow);
+    max-height:260px; overflow:auto; z-index:2000; display:none;
+  }
+  .s-item{padding:10px 12px; cursor:pointer}
+  .s-item:hover{background:#f3f4f6}
+  .s-sub{display:block; font-size:12px; color:#6b7280; margin-top:2px}
+
+  /* Directions / nav panel (mobile friendly) */
+  .panel{
+    position:fixed; right:10px; top:10px; bottom:10px; width:min(360px,86vw);
+    background:var(--bg); backdrop-filter:blur(10px); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:12px; z-index:900; overflow:auto; display:none;
+  }
+  .panel h3{margin:0 0 6px 0}
+  .badge{display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:12px; margin-right:6px}
+  ol{margin:8px 0 0 22px; padding:0}
+  li{margin:6px 0; line-height:1.35}
+
+  /* Nav bar on the bottom for mobile */
+  .navbar{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:10px;
+    display:flex; gap:8px; z-index:950;
+    background:var(--bg); box-shadow:var(--shadow); border-radius:999px; padding:8px
+  }
+
+  /* Responsive */
+  @media (max-width:720px){
+    .row{grid-template-columns:1fr}
+    .row2{grid-template-columns:1fr}
+    .panel{right:unset; left:10px; width:calc(100vw - 20px)}
+  }
+</style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
 
-  <!-- TOP BAR -->
-  <div class="card">
-    <div class="row">
-      <div class="field-wrap">
-        <input id="from" type="text" placeholder="From (place or lat,lon)" autocomplete="off">
-        <div id="from-suggest" class="suggestions" style="display:none"></div>
-      </div>
-      <button id="swap" class="secondary" title="Swap">⇄</button>
-      <button id="use-current" class="green" title="Use current location">📍 Current</button>
-      <button id="go" class="accent">Get Directions</button>
+<!-- TOP BAR -->
+<div class="card">
+  <div class="row">
+    <div class="wrap">
+      <input id="from" type="text" placeholder="From (place or lat,lon)" autocomplete="off">
+      <div id="fromSug" class="sug"></div>
     </div>
-    <div class="row" style="margin-top:8px; grid-template-columns: 1fr auto;">
-      <div class="field-wrap">
-        <input id="to" type="text" placeholder="To (place or lat,lon)" autocomplete="off">
-        <div id="to-suggest" class="suggestions" style="display:none"></div>
-      </div>
-      <button id="clear" class="secondary">Clear</button>
+    <button id="swap" class="btn" title="Swap">⇄</button>
+    <button id="useCur" class="green" title="Use current">📍 Current</button>
+    <button id="go" class="accent">Get Directions</button>
+  </div>
+  <div class="row2">
+    <div class="wrap">
+      <input id="to" type="text" placeholder="To (place or lat,lon)" autocomplete="off">
+      <div id="toSug" class="sug"></div>
     </div>
+    <button id="clear" class="btn">Clear</button>
   </div>
+  <div class="muted" style="margin-top:6px">Tip: press <strong>Enter</strong> to route • tap map to set destination quickly</div>
+</div>
 
-  <!-- DIRECTIONS PANEL -->
-  <div id="panel" class="panel" style="display:none">
-    <div id="summary" class="muted"></div>
-    <ol id="steps" class="steps"></ol>
-  </div>
+<!-- DIRECTIONS PANEL -->
+<div id="panel" class="panel">
+  <h3>Route</h3>
+  <div id="summary" class="muted"></div>
+  <ol id="steps"></ol>
+</div>
 
-  <script>
-    // --- MAP ---
-    const map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5); // India default
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors'
+<!-- NAV CONTROLS (bottom) -->
+<div class="navbar">
+  <button id="startNav" class="green">▶ Start Nav</button>
+  <button id="pauseNav" class="btn">⏸ Pause</button>
+  <button id="stopNav" class="danger">■ Stop</button>
+  <button id="mute" class="btn" title="Mute/Unmute">🔊</button>
+  <button id="recenter" class="btn" title="Re-center">🎯</button>
+</div>
+
+<script>
+  // --- Map setup ---
+  const map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5); // India default
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  // --- UI elements ---
+  const fromEl = document.getElementById('from');
+  const toEl = document.getElementById('to');
+  const fromSug = document.getElementById('fromSug');
+  const toSug = document.getElementById('toSug');
+  const goBtn = document.getElementById('go');
+  const clearBtn = document.getElementById('clear');
+  const swapBtn = document.getElementById('swap');
+  const useCurBtn = document.getElementById('useCur');
+  const panel = document.getElementById('panel');
+  const summaryEl = document.getElementById('summary');
+  const stepsEl = document.getElementById('steps');
+
+  const startNavBtn = document.getElementById('startNav');
+  const pauseNavBtn = document.getElementById('pauseNav');
+  const stopNavBtn = document.getElementById('stopNav');
+  const muteBtn = document.getElementById('mute');
+  const recenterBtn = document.getElementById('recenter');
+
+  // --- State ---
+  let routingControl = null;
+  let currentRoute = null;       // LRM route object + coordinates + instructions
+  let routeLine = null;          // Polyline drawn by LRM; we will rely on LRM
+  let userMarker = null;
+  let watchId = null;
+  let navActive = false;
+  let navPaused = false;
+  let voiceMuted = false;
+  let nextInstructionIdx = 0;    // index in instructions array
+  let followUser = true;
+
+  // --- Helpers ---
+  function parseLatLon(text){
+    const parts = text.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && parts.every(n => !Number.isNaN(n))) return L.latLng(parts[0], parts[1]);
+    return null;
+  }
+  async function photonSearch(q){
+    const url = new URL('https://photon.komoot.io/api/');
+    url.searchParams.set('q', q); url.searchParams.set('limit','8');
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('search failed');
+    return res.json();
+  }
+  function renderSuggestions(box, features, onPick){
+    box.innerHTML = '';
+    if(!features || !features.length){ box.style.display = 'none'; return; }
+    features.forEach(f=>{
+      const name = f.properties.name || f.properties.street || 'Unnamed';
+      const ctx = [f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', ');
+      const div = document.createElement('div');
+      div.className = 's-item';
+      div.innerHTML = `${name}<span class="s-sub">${ctx}</span>`;
+      div.addEventListener('click', () => onPick(f));
+      box.appendChild(div);
+    });
+    box.style.display = 'block';
+  }
+  function attachAutocomplete(input, box){
+    let t;
+    input.addEventListener('input', ()=>{
+      input.removeAttribute('data-lat'); input.removeAttribute('data-lon');
+      const q = input.value.trim();
+      clearTimeout(t);
+      if(q.length < 2){ box.style.display='none'; return; }
+      t = setTimeout(async ()=>{
+        try{
+          const data = await photonSearch(q);
+          renderSuggestions(box, data.features, (f)=>{
+            const [lon, lat] = f.geometry.coordinates;
+            input.dataset.lat = lat; input.dataset.lon = lon;
+            const label = (f.properties.name||'') + (f.properties.city?`, ${f.properties.city}`:'') + (f.properties.country?`, ${f.properties.country}`:'');
+            input.value = label;
+            box.style.display = 'none';
+          });
+        }catch{ box.style.display='none'; }
+      }, 200);
+    });
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter' && box.firstChild){ e.preventDefault(); box.firstChild.click(); }
+    });
+    document.addEventListener('click', e=>{ if(!box.contains(e.target) && e.target !== input) box.style.display='none'; });
+  }
+  attachAutocomplete(fromEl, fromSug);
+  attachAutocomplete(toEl, toSug);
+
+  async function geocodeIfNeeded(input){
+    if(input.dataset.lat && input.dataset.lon) return L.latLng(parseFloat(input.dataset.lat), parseFloat(input.dataset.lon));
+    const parsed = parseLatLon(input.value.trim());
+    if(parsed) return parsed;
+    // fallback geocode via Photon (first result)
+    const j = await photonSearch(input.value.trim());
+    if(!j.features || !j.features[0]) throw new Error('Place not found: ' + input.value.trim());
+    const [lon, lat] = j.features[0].geometry.coordinates;
+    input.dataset.lat = lat; input.dataset.lon = lon;
+    return L.latLng(lat, lon);
+  }
+
+  async function reverseGeocode(latlng){
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format','jsonv2');
+    url.searchParams.set('lat', latlng.lat);
+    url.searchParams.set('lon', latlng.lng);
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' }});
+    if(!res.ok) return null;
+    return res.json();
+  }
+
+  // --- Routing via Leaflet Routing Machine (OSRM) ---
+  function makeRoute(fromLL, toLL){
+    if(routingControl){ map.removeControl(routingControl); routingControl = null; }
+    routingControl = L.Routing.control({
+      waypoints: [fromLL, toLL],
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      routeWhileDragging: false,
+      addWaypoints: false,
+      showAlternatives: false,
+      show: false, // hide LRM's default panel
+      lineOptions: { styles:[{color:'#2563eb', opacity:0.9, weight:6}] },
+      createMarker: function(i, wp, n){ // our own nice markers
+        return L.marker(wp.latLng, { draggable:false });
+      }
     }).addTo(map);
 
-    // --- STATE ---
-    let routeLayer = null, startMarker = null, endMarker = null;
-    const fromInput = document.getElementById('from');
-    const toInput = document.getElementById('to');
-    const fromSuggest = document.getElementById('from-suggest');
-    const toSuggest = document.getElementById('to-suggest');
-    const goBtn = document.getElementById('go');
-    const clearBtn = document.getElementById('clear');
-    const swapBtn = document.getElementById('swap');
-    const useCurrentBtn = document.getElementById('use-current');
-    const panel = document.getElementById('panel');
-    const summary = document.getElementById('summary');
-    const stepsList = document.getElementById('steps');
-
-    // store chosen coords in dataset to avoid re-geocoding
-    function setCoordsOnInput(input, lat, lon, label) {
-      input.dataset.lat = String(lat);
-      input.dataset.lon = String(lon);
-      if (label) input.value = label;
-    }
-    function getCoordsFromInput(input) {
-      // prefer cached coords
-      if (input.dataset.lat && input.dataset.lon) {
-        return [parseFloat(input.dataset.lat), parseFloat(input.dataset.lon)];
-      }
-      // parse "lat,lon"
-      const v = input.value.trim();
-      const parts = v.split(',').map(s => parseFloat(s));
-      if (parts.length === 2 && parts.every(n => !Number.isNaN(n))) {
-        return [parts[0], parts[1]];
-      }
-      return null; // needs geocoding
-    }
-
-    // --- AUTOCOMPLETE (Photon) ---
-    async function searchPhoton(query) {
-      const url = new URL('https://photon.komoot.io/api/');
-      url.searchParams.set('q', query);
-      url.searchParams.set('limit', '8');
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Search failed');
-      return res.json();
-    }
-    function renderSuggestions(box, features, onPick) {
-      box.innerHTML = '';
-      if (!features || !features.length) {
-        box.style.display = 'none'; return;
-      }
-      features.forEach(f => {
-        const name = f.properties.name || f.properties.street || 'Unnamed';
-        const ctx = [f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', ');
-        const div = document.createElement('div');
-        div.className = 's-item';
-        div.innerHTML = `${name}<span class="s-sub">${ctx}</span>`;
-        div.addEventListener('click', () => onPick(f));
-        box.appendChild(div);
-      });
-      box.style.display = 'block';
-    }
-    function attachAutocomplete(input, box) {
-      let timer;
-      input.addEventListener('input', () => {
-        input.removeAttribute('data-lat');
-        input.removeAttribute('data-lon');
-        const q = input.value.trim();
-        clearTimeout(timer);
-        if (q.length < 2) { box.style.display = 'none'; return; }
-        timer = setTimeout(async () => {
-          try {
-            const data = await searchPhoton(q);
-            renderSuggestions(box, data.features, (f) => {
-              const [lon, lat] = f.geometry.coordinates;
-              const label = (f.properties.name || '') + (f.properties.city ? `, ${f.properties.city}` : '') + (f.properties.country ? `, ${f.properties.country}` : '');
-              setCoordsOnInput(input, lat, lon, label);
-              box.style.display = 'none';
-            });
-          } catch (e) { box.style.display = 'none'; }
-        }, 200);
-      });
-      input.addEventListener('keydown', (e) => {
-        // If user presses Enter, pick first suggestion automatically
-        if (e.key === 'Enter' && box.firstChild) {
-          e.preventDefault();
-          box.firstChild.click();
-        }
-      });
-      document.addEventListener('click', (e) => {
-        if (!box.contains(e.target) && e.target !== input) box.style.display = 'none';
-      });
-    }
-    attachAutocomplete(fromInput, fromSuggest);
-    attachAutocomplete(toInput, toSuggest);
-
-    // --- REVERSE GEOCODE (Nominatim) ---
-    async function reverseGeocode(lat, lon) {
-      const url = new URL('https://nominatim.openstreetmap.org/reverse');
-      url.searchParams.set('format', 'jsonv2');
-      url.searchParams.set('lat', lat);
-      url.searchParams.set('lon', lon);
-      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-      if (!res.ok) return null;
-      return res.json();
-    }
-
-    // --- ROUTING (OSRM) ---
-    async function route(fromLat, fromLon, toLat, toLon) {
-      const url = `https://router.project-osrm.org/route/v1/driving/${fromLon},${fromLat};${toLon},${toLat}?overview=full&geometries=geojson&steps=true`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Routing server error');
-      const data = await res.json();
-      if (!data.routes || !data.routes[0]) throw new Error('No route found');
-
-      const r = data.routes[0];
-
-      // Clear old
-      if (routeLayer) { routeLayer.remove(); routeLayer = null; }
-      if (startMarker) { startMarker.remove(); startMarker = null; }
-      if (endMarker) { endMarker.remove(); endMarker = null; }
-
-      // Draw route
-      routeLayer = L.geoJSON(r.geometry, {
-        style: { color: '#2563eb', weight: 6, opacity: .9 }
-      }).addTo(map);
-
-      startMarker = L.marker([fromLat, fromLon]).addTo(map).bindPopup('Start');
-      endMarker = L.marker([toLat, toLon]).addTo(map).bindPopup('Destination');
-
-      map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
-
-      // Panel
+    routingControl.on('routesfound', e=>{
+      currentRoute = e.routes[0]; // LRM route with .instructions and .coordinates
+      nextInstructionIdx = 0;
+      // Fit bounds
+      const ll = L.latLngBounds(currentRoute.coordinates);
+      map.fitBounds(ll, { padding:[60,60] });
+      // Fill panel
+      renderRoutePanel(currentRoute);
       panel.style.display = 'block';
-      const km = (r.distance / 1000).toFixed(1);
-      const minutes = Math.round(r.duration / 60);
-      summary.innerHTML = `<span class="badge">${km} km</span><span class="badge">~${minutes} min</span> Turn-by-turn:`;
+    });
 
-      stepsList.innerHTML = '';
-      // Collect steps from all legs
-      r.legs.forEach(leg => {
-        leg.steps.forEach(s => {
-          const li = document.createElement('li');
-          // Some OSRM steps have empty instruction; fallback to street name
-          li.textContent = s.maneuver.instruction || s.name || 'Continue';
-          stepsList.appendChild(li);
-        });
-      });
+    routingControl.on('routingerror', ()=> alert('Routing failed. Try different points.'));
+  }
+
+  function renderRoutePanel(route){
+    const km = (route.summary.totalDistance/1000).toFixed(1);
+    const min = Math.round(route.summary.totalTime/60);
+    summaryEl.innerHTML = `<span class="badge">${km} km</span><span class="badge">~${min} min</span> Turn-by-turn:`;
+    stepsEl.innerHTML = '';
+    (route.instructions || []).forEach(ins=>{
+      const li = document.createElement('li');
+      li.textContent = ins.text;
+      stepsEl.appendChild(li);
+    });
+  }
+
+  // --- Voice (SpeechSynthesis) ---
+  function speak(text){
+    if(voiceMuted || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-IN'; // Indian English vibe; change if you prefer
+    u.rate = 1.05;
+    window.speechSynthesis.cancel(); // replace pending
+    window.speechSynthesis.speak(u);
+  }
+
+  function distance(a,b){ return map.distance(a,b); }
+
+  // Decide when to announce next instruction:
+  // Use route.coordinates[ins.index] as the "turn point".
+  function handleNavUpdate(userLL){
+    if(!navActive || !currentRoute) return;
+    const instr = currentRoute.instructions || [];
+    if(nextInstructionIdx >= instr.length) return;
+
+    const turnPoint = currentRoute.coordinates[instr[nextInstructionIdx].index];
+    const d = distance(userLL, turnPoint);
+
+    // Announce at ~120 m, and again at ~30 m before the turn (typical nav behavior)
+    const current = instr[nextInstructionIdx];
+    if(d < 30){
+      speak(current.text);
+      nextInstructionIdx++;
+    } else if(d < 120 && !current._preAnnounced){
+      speak('In ' + Math.max(30, Math.round(d/10)*10) + ' meters, ' + current.text);
+      current._preAnnounced = true;
     }
+  }
 
-    async function geocodeIfNeeded(input) {
-      const cached = getCoordsFromInput(input);
-      if (cached) return cached; // [lat, lon]
-      const q = input.value.trim();
-      if (!q) throw new Error('Empty field');
-      const data = await searchPhoton(q);
-      if (!data.features || !data.features[0]) throw new Error('Place not found: ' + q);
-      const [lon, lat] = data.features[0].geometry.coordinates;
-      // cache
-      setCoordsOnInput(input, lat, lon);
-      return [lat, lon];
+  // --- Geolocation / live tracking ---
+  function startWatch(){
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    if(!navigator.geolocation){ alert('Geolocation not supported'); return; }
+    watchId = navigator.geolocation.watchPosition(pos=>{
+      const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      if(!userMarker){
+        userMarker = L.marker(ll, {
+          icon: L.icon({ iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41] })
+        }).addTo(map).bindPopup('You are here');
+      } else {
+        userMarker.setLatLng(ll);
+      }
+      if(followUser) map.setView(ll, Math.max(15, map.getZoom()), { animate:true });
+
+      // During navigation, evaluate next turn proximity
+      handleNavUpdate(ll);
+    }, err=>{
+      alert('Location error: ' + err.message);
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  }
+  function stopWatch(){
+    if(watchId){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+  }
+
+  // --- Buttons ---
+  goBtn.addEventListener('click', async ()=>{
+    try{
+      goBtn.disabled = true; goBtn.textContent = 'Routing…';
+      const fromLL = await geocodeIfNeeded(fromEl);
+      const toLL   = await geocodeIfNeeded(toEl);
+      makeRoute(fromLL, toLL);
+    }catch(e){ alert(e.message || 'Failed to route'); }
+    finally{ goBtn.disabled = false; goBtn.textContent = 'Get Directions'; }
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    fromEl.value = ''; toEl.value = '';
+    fromEl.removeAttribute('data-lat'); fromEl.removeAttribute('data-lon');
+    toEl.removeAttribute('data-lat'); toEl.removeAttribute('data-lon');
+    if(routingControl){ map.removeControl(routingControl); routingControl = null; }
+    currentRoute = null; nextInstructionIdx = 0;
+    panel.style.display = 'none';
+  });
+
+  swapBtn.addEventListener('click', ()=>{
+    const v1 = fromEl.value, v2 = toEl.value;
+    const la1 = fromEl.dataset.lat, lo1 = fromEl.dataset.lon;
+    const la2 = toEl.dataset.lat, lo2 = toEl.dataset.lon;
+    fromEl.value = v2; toEl.value = v1;
+    if(la2 && lo2){ fromEl.dataset.lat = la2; fromEl.dataset.lon = lo2; } else { fromEl.removeAttribute('data-lat'); fromEl.removeAttribute('data-lon'); }
+    if(la1 && lo1){ toEl.dataset.lat = la1; toEl.dataset.lon = lo1; } else { toEl.removeAttribute('data-lat'); toEl.removeAttribute('data-lon'); }
+  });
+
+  useCurBtn.addEventListener('click', ()=>{
+    if(!navigator.geolocation) return alert('Geolocation not supported');
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      map.setView(ll, 14);
+      if(userMarker) userMarker.setLatLng(ll); else userMarker = L.marker(ll).addTo(map).bindPopup('You are here').openPopup();
+      try{
+        const r = await reverseGeocode(ll);
+        const label = r?.display_name || `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        fromEl.value = label; fromEl.dataset.lat = ll.lat; fromEl.dataset.lon = ll.lng;
+      }catch{
+        fromEl.value = `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`; fromEl.dataset.lat = ll.lat; fromEl.dataset.lon = ll.lng;
+      }
+    }, err=> alert(err.message), { enableHighAccuracy:true, timeout:20000 });
+  });
+
+  // Start/Pause/Stop live navigation
+  startNavBtn.addEventListener('click', ()=>{
+    if(!currentRoute){ alert('Get a route first'); return; }
+    navActive = true; navPaused = false; followUser = true;
+    speak('Starting navigation');
+    startWatch();
+  });
+  pauseNavBtn.addEventListener('click', ()=>{
+    if(!navActive) return;
+    navPaused = !navPaused;
+    if(navPaused){ speak('Navigation paused'); stopWatch(); pauseNavBtn.textContent = '▶ Resume'; }
+    else { speak('Resuming navigation'); startWatch(); pauseNavBtn.textContent = '⏸ Pause'; }
+  });
+  stopNavBtn.addEventListener('click', ()=>{
+    if(!navActive) return;
+    navActive = false; navPaused = false; followUser = false; nextInstructionIdx = 0;
+    speak('Navigation stopped');
+    stopWatch();
+    pauseNavBtn.textContent = '⏸ Pause';
+  });
+  muteBtn.addEventListener('click', ()=>{
+    voiceMuted = !voiceMuted;
+    muteBtn.textContent = voiceMuted ? '🔇' : '🔊';
+  });
+  recenterBtn.addEventListener('click', ()=>{ followUser = true; if(userMarker) map.setView(userMarker.getLatLng(), Math.max(15, map.getZoom())); });
+
+  // Quick UX: pressing Enter triggers routing
+  document.addEventListener('keydown', e=>{ if(e.key === 'Enter') goBtn.click(); });
+
+  // Tap on map to set destination quickly if empty
+  map.on('click', async (e)=>{
+    if(!toEl.value){
+      const ll = e.latlng;
+      try{
+        const r = await reverseGeocode(ll);
+        const label = r?.display_name || `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        toEl.value = label; toEl.dataset.lat = ll.lat; toEl.dataset.lon = ll.lng;
+      }catch{
+        toEl.value = `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`; toEl.dataset.lat = ll.lat; toEl.dataset.lon = ll.lng;
+      }
     }
+  });
 
-    // --- BUTTONS ---
-    goBtn.addEventListener('click', async () => {
-      try {
-        goBtn.disabled = true; goBtn.textContent = 'Routing…';
-        const [fromLat, fromLon] = await geocodeIfNeeded(fromInput);
-        const [toLat, toLon] = await geocodeIfNeeded(toInput);
-        await route(fromLat, fromLon, toLat, toLon);
-      } catch (e) {
-        alert(e.message || 'Failed to get directions');
-      } finally {
-        goBtn.disabled = false; goBtn.textContent = 'Get Directions';
-      }
-    });
+  // If user manually moves map during nav, stop auto-follow until recenter
+  map.on('movestart', ()=>{ followUser = false; });
 
-    clearBtn.addEventListener('click', () => {
-      fromInput.value = ''; toInput.value = '';
-      fromInput.removeAttribute('data-lat'); fromInput.removeAttribute('data-lon');
-      toInput.removeAttribute('data-lat'); toInput.removeAttribute('data-lon');
-      if (routeLayer) { routeLayer.remove(); routeLayer = null; }
-      if (startMarker) { startMarker.remove(); startMarker = null; }
-      if (endMarker) { endMarker.remove(); endMarker = null; }
-      panel.style.display = 'none';
-    });
-
-    swapBtn.addEventListener('click', () => {
-      const v1 = fromInput.value, v2 = toInput.value;
-      const lat1 = fromInput.dataset.lat, lon1 = fromInput.dataset.lon;
-      const lat2 = toInput.dataset.lat, lon2 = toInput.dataset.lon;
-      fromInput.value = v2; toInput.value = v1;
-      if (lat2 && lon2) { setCoordsOnInput(fromInput, lat2, lon2); } else { fromInput.removeAttribute('data-lat'); fromInput.removeAttribute('data-lon'); }
-      if (lat1 && lon1) { setCoordsOnInput(toInput, lat1, lon1); } else { toInput.removeAttribute('data-lat'); toInput.removeAttribute('data-lon'); }
-    });
-
-    useCurrentBtn.addEventListener('click', () => {
-      if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
-      navigator.geolocation.getCurrentPosition(async pos => {
-        const lat = pos.coords.latitude, lon = pos.coords.longitude;
-        map.setView([lat, lon], 14);
-        // reverse geocode to nice label
-        try {
-          const j = await reverseGeocode(lat, lon);
-          const label = j?.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-          setCoordsOnInput(fromInput, lat, lon, label);
-        } catch {
-          setCoordsOnInput(fromInput, lat, lon, `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-        }
-      }, err => alert(err.message), { enableHighAccuracy: true, timeout: 20000 });
-    });
-
-    // Click on map to quickly set To if empty (nice UX)
-    map.on('click', async (e) => {
-      if (!toInput.value) {
-        const lat = e.latlng.lat, lon = e.latlng.lng;
-        try {
-          const j = await reverseGeocode(lat, lon);
-          const label = j?.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-          setCoordsOnInput(toInput, lat, lon, label);
-        } catch {
-          setCoordsOnInput(toInput, lat, lon, `${lat.toFixed(5)}, ${lon.toFixed(5)}`);
-        }
-      }
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') goBtn.click();
-      if (e.key.toLowerCase() === 'c') useCurrentBtn.click();
-      if (e.key.toLowerCase() === 'x') swapBtn.click();
-    });
-  </script>
+</script>
 </body>
 </html>
