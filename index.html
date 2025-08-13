@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
 <title>Web Map – Real-time Navigation (OSM)</title>
 
 <!-- Leaflet core -->
@@ -21,14 +21,15 @@
     --accent: #2563eb;
     --green: #10b981;
     --dark: #111827;
-    --top-height: 140px;
+    --top-height: 160px;
+    --mobile-top-height: 180px;
   }
   
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827}
+  html,body{height:100vh;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827;overflow:hidden}
   
   #map{
-    position:absolute;
+    position:fixed;
     top:0;
     left:0;
     right:0;
@@ -36,7 +37,7 @@
     z-index:1;
   }
 
-  /* Top controls with proper spacing */
+  /* Enhanced top controls with better mobile spacing */
   .top-controls {
     position: fixed;
     top: 0;
@@ -46,7 +47,7 @@
     background: var(--bg);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow);
-    padding: 10px;
+    padding: 12px;
     border-radius: 0 0 var(--radius) var(--radius);
   }
 
@@ -55,48 +56,104 @@
     margin: 0 auto;
   }
   
-  .row{display:grid; grid-template-columns:1fr auto auto auto; gap:7px; align-items:center}
-  .row2{display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:6px}
-  .wrap{position:relative}
+  .row{
+    display:grid; 
+    grid-template-columns:1fr auto auto auto; 
+    gap:8px; 
+    align-items:stretch;
+  }
+  .row2{
+    display:grid; 
+    grid-template-columns:1fr auto; 
+    gap:8px; 
+    margin-top:8px;
+    align-items:stretch;
+  }
+  .wrap{position:relative;flex:1;}
   
   input[type="text"]{
-    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px;
-    font-size:14px; outline:none; background:#fff;
+    width:100%; 
+    padding:12px 14px; 
+    border:1px solid #e5e7eb; 
+    border-radius:12px;
+    font-size:16px; /* Prevents zoom on iOS */
+    outline:none; 
+    background:#fff;
+    min-height:44px; /* iOS touch target minimum */
+    touch-action:manipulation;
   }
-  input[type="text"]:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  input[type="text"]:focus{
+    border-color:var(--accent); 
+    box-shadow:0 0 0 3px rgba(37,99,235,.12);
+  }
   
   button{
-    padding:10px 12px; border:0; border-radius:10px; cursor:pointer; font-weight:600;
-    background:var(--dark); color:#fff; white-space:nowrap;
+    padding:12px 14px; 
+    border:0; 
+    border-radius:12px; 
+    cursor:pointer; 
+    font-weight:600;
+    background:var(--dark); 
+    color:#fff; 
+    white-space:nowrap;
+    min-height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:14px;
+    touch-action:manipulation;
+    transition:all 0.2s ease;
+  }
+  button:active{
+    transform:scale(0.98);
   }
   .btn{background:#e5e7eb;color:#111827}
   .accent{background:var(--accent); color:#fff}
   .green{background:var(--green); color:#fff}
   .danger{background:#ef4444; color:#fff}
-  .muted{color:#6b7280; font-size:12px}
+  .muted{color:#6b7280; font-size:12px;margin-top:8px;}
 
-  /* Suggestions dropdown */
+  /* Enhanced suggestions dropdown for mobile */
   .sug{
-    position:absolute; left:0; right:0; top:calc(100% + 6px);
-    background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:var(--shadow);
-    max-height:260px; overflow:auto; z-index:2000; display:none;
+    position:absolute; 
+    left:0; 
+    right:0; 
+    top:calc(100% + 8px);
+    background:#fff; 
+    border:1px solid #e5e7eb; 
+    border-radius:14px; 
+    box-shadow:var(--shadow);
+    max-height:280px; 
+    overflow-y:auto; 
+    z-index:2000; 
+    display:none;
+    -webkit-overflow-scrolling:touch;
   }
-  .s-item{padding:10px 12px; cursor:pointer}
-  .s-item:hover{background:#f3f4f6}
-  .s-sub{display:block; font-size:12px; color:#6b7280; margin-top:2px}
+  .s-item{
+    padding:14px 16px; 
+    cursor:pointer;
+    border-bottom:1px solid #f3f4f6;
+    min-height:60px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .s-item:last-child{border-bottom:none;}
+  .s-item:hover,.s-item:active{background:#f8fafc}
+  .s-sub{display:block; font-size:12px; color:#6b7280; margin-top:3px;line-height:1.3;}
 
-  /* Navigation info panel */
+  /* Mobile-optimized navigation info panel */
   .nav-info {
     position: fixed;
     top: var(--top-height);
-    left: 10px;
-    right: 10px;
+    left: 12px;
+    right: 12px;
     z-index: 950;
     background: var(--bg);
     backdrop-filter: blur(10px);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 15px;
+    padding: 16px;
     display: none;
     max-width: 600px;
     margin: 0 auto;
@@ -106,89 +163,116 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    flex-wrap:wrap;
+    gap:8px;
   }
 
   .next-instruction {
     font-size: 16px;
     font-weight: 600;
-    margin: 8px 0;
+    margin: 10px 0;
     color: var(--dark);
+    line-height:1.4;
   }
 
   .nav-stats {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 10px;
   }
 
   .stat {
     background: #f3f4f6;
-    padding: 6px 10px;
-    border-radius: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
     font-size: 12px;
     font-weight: 600;
+    text-align:center;
   }
 
-  /* Directions panel - better positioned */
+  /* Mobile-first directions panel */
   .panel{
     position:fixed; 
-    right:10px; 
-    top:calc(var(--top-height) + 20px); 
-    bottom:80px; 
-    width:min(360px,90vw);
+    left:12px;
+    right:12px;
+    top:calc(var(--top-height) + 120px); 
+    bottom:90px; 
     background:var(--bg); 
     backdrop-filter:blur(10px); 
     border-radius:var(--radius);
     box-shadow:var(--shadow); 
-    padding:12px; 
+    padding:16px; 
     z-index:900; 
-    overflow:auto; 
+    overflow-y:auto; 
     display:none;
+    -webkit-overflow-scrolling:touch;
   }
-  .panel h3{margin:0 0 6px 0}
-  .badge{display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:12px; margin-right:6px}
-  ol{margin:8px 0 0 22px; padding:0}
-  li{margin:6px 0; line-height:1.35}
-  li.current{background:#e0f2fe; padding:4px; border-radius:6px; font-weight:600;}
+  .panel h3{margin:0 0 8px 0;font-size:18px;}
+  .badge{
+    display:inline-block; 
+    padding:6px 10px; 
+    border-radius:999px; 
+    background:#eef2ff; 
+    color:#3730a3; 
+    font-weight:700; 
+    font-size:12px; 
+    margin-right:8px;
+    margin-bottom:4px;
+  }
+  ol{margin:12px 0 0 0; padding:0 0 0 20px;}
+  li{
+    margin:8px 0; 
+    line-height:1.5;
+    padding:6px 0;
+  }
+  li.current{
+    background:#e0f2fe; 
+    padding:8px 10px; 
+    border-radius:8px; 
+    font-weight:600;
+    margin-left:-10px;
+  }
 
-  /* Navigation controls */
+  /* Enhanced mobile navigation controls */
   .navbar{
     position:fixed; 
-    left:50%; 
-    transform:translateX(-50%); 
-    bottom:10px;
-    display:flex; 
+    left:12px;
+    right:12px;
+    bottom:12px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));
     gap:8px; 
     z-index:950;
     background:var(--bg); 
     box-shadow:var(--shadow); 
-    border-radius:999px; 
-    padding:8px;
-    flex-wrap: wrap;
+    border-radius:16px; 
+    padding:12px;
   }
 
-  /* Speed indicator */
+  /* Mobile speed indicator */
   .speed-indicator {
     position: fixed;
-    bottom: 80px;
-    right: 10px;
+    bottom: 100px;
+    right: 16px;
     background: var(--bg);
     backdrop-filter: blur(10px);
     border-radius: 50%;
     width: 60px;
     height: 60px;
     display: flex;
+    flex-direction:column;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 14px;
     box-shadow: var(--shadow);
     z-index: 940;
     display: none;
   }
+  .speed-indicator .unit{font-size:8px;color:#6b7280;margin-top:-2px;}
 
-  /* Progress bar for route */
+  /* Route progress bar */
   .route-progress {
     position: fixed;
     top: calc(var(--top-height) - 4px);
@@ -206,44 +290,177 @@
     transition: width 0.3s ease;
   }
 
-  /* Responsive design */
+  /* Enhanced mobile styles */
   @media (max-width:768px){
-    .row{grid-template-columns:1fr; gap:6px;}
-    .row2{grid-template-columns:1fr;}
-    .panel{
-      right:10px; 
-      left:10px;
-      width:auto;
-      top:calc(var(--top-height) + 100px);
-      bottom:80px;
+    :root{
+      --top-height: var(--mobile-top-height);
     }
-    .nav-info {
-      left: 10px;
-      right: 10px;
+    
+    .top-controls{
+      padding: 10px;
     }
-    .navbar{
-      gap:4px;
-      padding:6px;
+    
+    .row{
+      grid-template-columns:1fr;
+      gap:8px;
     }
+    .row2{
+      grid-template-columns:1fr;
+      gap:8px;
+    }
+    
+    input[type="text"]{
+      font-size:16px; /* Prevents zoom */
+      padding:14px 16px;
+    }
+    
     button{
-      padding:8px 10px;
+      padding:14px 16px;
+      min-height:50px;
+      font-size:15px;
+    }
+    
+    .panel{
+      top:calc(var(--mobile-top-height) + 20px);
+      bottom:100px;
+      left:8px;
+      right:8px;
+    }
+    
+    .nav-info {
+      top: var(--mobile-top-height);
+      left: 8px;
+      right: 8px;
+      padding:14px;
+    }
+    
+    .navbar{
+      left:8px;
+      right:8px;
+      bottom:8px;
+      grid-template-columns:1fr 1fr;
+      gap:6px;
+      padding:10px;
+    }
+    
+    .nav-stats{
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    
+    .speed-indicator {
+      bottom: 110px;
+      right: 12px;
+      width: 55px;
+      height: 55px;
+    }
+    
+    .next-instruction{
+      font-size:15px;
+    }
+    
+    /* Hide panel automatically on mobile when not navigating */
+    .panel.auto-hide{
+      display:none;
+    }
+  }
+
+  /* Extra small screens (phones in portrait) */
+  @media (max-width:480px){
+    .top-controls{
+      padding:8px;
+    }
+    
+    .card{
+      padding:0;
+    }
+    
+    input[type="text"]{
+      padding:12px 14px;
+      min-height:48px;
+    }
+    
+    button{
+      padding:12px 14px;
+      min-height:48px;
+      font-size:14px;
+    }
+    
+    .navbar{
+      padding:8px;
+      grid-template-columns:1fr 1fr;
+      gap:6px;
+    }
+    
+    .panel{
+      top:calc(var(--mobile-top-height) + 10px);
+      padding:12px;
+    }
+    
+    .nav-info{
+      padding:12px;
+    }
+    
+    .speed-indicator{
+      width:50px;
+      height:50px;
       font-size:12px;
     }
-    .speed-indicator {
-      bottom: 90px;
-      width: 50px;
-      height: 50px;
+  }
+
+  /* Landscape orientation on mobile */
+  @media (max-height:500px) and (orientation:landscape){
+    :root{
+      --mobile-top-height: 120px;
+    }
+    
+    .top-controls{
+      padding:6px;
+    }
+    
+    .row{
+      grid-template-columns:1fr auto auto auto;
+      gap:6px;
+    }
+    .row2{
+      grid-template-columns:1fr auto;
+      gap:6px;
+    }
+    
+    input[type="text"]{
+      padding:10px 12px;
+      min-height:40px;
+    }
+    
+    button{
+      padding:10px 12px;
+      min-height:40px;
+      font-size:13px;
+    }
+    
+    .panel{
+      top:calc(var(--mobile-top-height) + 10px);
+      bottom:70px;
+    }
+    
+    .navbar{
+      grid-template-columns:repeat(5, 1fr);
+      padding:6px;
+    }
+    
+    .nav-info{
+      top:calc(var(--mobile-top-height) - 10px);
     }
   }
 
   /* Custom user marker styles */
   .user-marker {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     background: #2563eb;
     border: 3px solid white;
     border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
   }
 
   .user-marker.moving {
@@ -253,13 +470,79 @@
   .direction-arrow {
     width: 0;
     height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 12px solid #2563eb;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 14px solid #2563eb;
     position: absolute;
-    top: -15px;
+    top: -18px;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  /* Touch improvements */
+  .leaflet-control-zoom{
+    border:none !important;
+    box-shadow:var(--shadow) !important;
+  }
+  .leaflet-control-zoom a{
+    width:50px !important;
+    height:50px !important;
+    line-height:50px !important;
+    font-size:20px !important;
+    border-radius:12px !important;
+    margin:2px !important;
+    background:var(--bg) !important;
+    color:var(--dark) !important;
+  }
+  .leaflet-control-attribution{
+    background:rgba(255,255,255,0.8) !important;
+    border-radius:8px !important;
+    font-size:10px !important;
+  }
+
+  /* Loading states */
+  .loading{
+    opacity:0.6;
+    pointer-events:none;
+  }
+  
+  /* Accessibility improvements */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+  
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: rgba(0,0,0,0.9);
+      --dark: #f9fafb;
+    }
+    
+    html, body {
+      background: #111827;
+      color: #f9fafb;
+    }
+    
+    input[type="text"] {
+      background: #374151;
+      border-color: #4b5563;
+      color: #f9fafb;
+    }
+    
+    .sug, .s-item {
+      background: #374151;
+      border-color: #4b5563;
+      color: #f9fafb;
+    }
+    
+    .btn {
+      background: #4b5563;
+      color: #f9fafb;
+    }
   }
 </style>
 </head>
@@ -276,22 +559,22 @@
   <div class="card">
     <div class="row">
       <div class="wrap">
-        <input id="from" type="text" placeholder="From (place or lat,lon)" autocomplete="off">
+        <input id="from" type="text" placeholder="From (place or coordinates)" autocomplete="off">
         <div id="fromSug" class="sug"></div>
       </div>
       <button id="swap" class="btn" title="Swap">⇄</button>
-      <button id="useCur" class="green" title="Use current">📍</button>
+      <button id="useCur" class="green" title="Use current location">📍</button>
       <button id="go" class="accent">Route</button>
     </div>
     <div class="row2">
       <div class="wrap">
-        <input id="to" type="text" placeholder="To (place or lat,lon)" autocomplete="off">
+        <input id="to" type="text" placeholder="To (place or coordinates)" autocomplete="off">
         <div id="toSug" class="sug"></div>
       </div>
       <button id="clear" class="btn">Clear</button>
     </div>
-    <div class="muted" style="margin-top:6px">
-      <strong>Enter</strong> to route • Tap map for quick destination
+    <div class="muted">
+      <strong>Tap Route</strong> to get directions • <strong>Tap map</strong> for quick destination
     </div>
   </div>
 </div>
@@ -301,7 +584,7 @@
   <div class="nav-header">
     <span class="badge" id="navDistance"></span>
     <span class="badge" id="navTime"></span>
-    <button id="closeNavInfo" class="btn" style="padding:4px 8px;">✕</button>
+    <button id="closeNavInfo" class="btn" style="padding:6px 10px;">✕</button>
   </div>
   <div class="next-instruction" id="nextInstruction">Get directions to start navigation</div>
   <div class="nav-stats">
@@ -321,6 +604,7 @@
 <!-- Speed indicator -->
 <div id="speedIndicator" class="speed-indicator">
   <div id="speedText">0</div>
+  <div class="unit">km/h</div>
 </div>
 
 <!-- Navigation controls -->
@@ -337,7 +621,9 @@
   // --- Enhanced Map setup ---
   const map = L.map('map', { 
     zoomControl: false,
-    attributionControl: false
+    attributionControl: false,
+    tap: true,
+    tapTolerance: 15
   }).setView([20.5937, 78.9629], 5);
   
   L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -400,7 +686,8 @@
     distanceTraveled: 0,
     currentSpeed: 0,
     previousPositions: [],
-    smoothingFactor: 0.3
+    smoothingFactor: 0.3,
+    isMobile: window.innerWidth <= 768
   };
 
   // --- Utility Functions ---
@@ -444,6 +731,20 @@
     return `${Math.round(meters)} m`;
   }
 
+  // Mobile detection and handling
+  function updateMobileState() {
+    state.isMobile = window.innerWidth <= 768;
+    
+    // Auto-hide panels on mobile when not navigating
+    if (state.isMobile && !state.navActive) {
+      setTimeout(() => {
+        if (elements.panel.style.display === 'block' && !state.navActive) {
+          elements.panel.classList.add('auto-hide');
+        }
+      }, 10000);
+    }
+  }
+
   // --- Enhanced Geocoding ---
   async function photonSearch(q){
     const url = new URL('https://photon.komoot.io/api/');
@@ -468,6 +769,17 @@
       div.className = 's-item';
       div.innerHTML = `${name}<span class="s-sub">${ctx}</span>`;
       div.addEventListener('click', () => onPick(f));
+      
+      // Enhanced touch handling
+      div.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        div.style.background = '#f8fafc';
+      });
+      div.addEventListener('touchend', () => {
+        div.style.background = '';
+        onPick(f);
+      });
+      
       box.appendChild(div);
     });
     box.style.display = 'block';
@@ -500,7 +812,7 @@
         }catch{ 
           box.style.display='none'; 
         }
-      }, 200);
+      }, 300);
     });
 
     input.addEventListener('keydown', e=>{
@@ -510,7 +822,14 @@
       }
     });
 
+    // Enhanced touch and click handling
     document.addEventListener('click', e=>{
+      if(!box.contains(e.target) && e.target !== input) {
+        box.style.display='none';
+      }
+    });
+    
+    document.addEventListener('touchstart', e=>{
       if(!box.contains(e.target) && e.target !== input) {
         box.style.display='none';
       }
@@ -587,6 +906,7 @@
       
       renderRoutePanel(state.currentRoute);
       elements.panel.style.display = 'block';
+      elements.panel.classList.remove('auto-hide');
       
       updateNavigationInfo();
     });
@@ -629,8 +949,8 @@
     const icon = L.divIcon({
       className: 'user-marker',
       html: '<div class="direction-arrow"></div>',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
     });
     
     return L.marker(position, { icon }).addTo(map);
@@ -649,6 +969,16 @@
       const arrow = markerElement.querySelector('.direction-arrow');
       if (arrow && !isNaN(heading)) {
         arrow.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+      }
+      
+      // Add moving class when speed > 1 km/h
+      const marker = markerElement.querySelector('.user-marker');
+      if (marker) {
+        if (state.currentSpeed > 1) {
+          marker.classList.add('moving');
+        } else {
+          marker.classList.remove('moving');
+        }
       }
     }
   }
@@ -697,7 +1027,10 @@
       const steps = elements.steps.querySelectorAll('li');
       steps.forEach(step => step.classList.remove('current'));
       const currentStep = document.getElementById(`step-${state.nextInstructionIdx}`);
-      if (currentStep) currentStep.classList.add('current');
+      if (currentStep) {
+        currentStep.classList.add('current');
+        currentStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       
       speak(currentInstruction.text, true);
       state.nextInstructionIdx++;
@@ -800,11 +1133,16 @@
       
     }, error => {
       console.error('Location error:', error);
-      alert(`Location error: ${error.message}`);
+      const errorMessages = {
+        1: 'Location access denied. Please enable location services.',
+        2: 'Location unavailable. Please check your connection.',
+        3: 'Location request timed out. Please try again.'
+      };
+      alert(errorMessages[error.code] || `Location error: ${error.message}`);
     }, { 
       enableHighAccuracy: true, 
       maximumAge: 1000, 
-      timeout: 10000 
+      timeout: 15000 
     });
   }
 
@@ -832,8 +1170,17 @@
     elements.navInfo.style.display = 'block';
     elements.speedIndicator.style.display = 'flex';
     elements.startNav.style.display = 'none';
-    elements.pauseNav.style.display = 'inline-block';
-    elements.stopNav.style.display = 'inline-block';
+    elements.pauseNav.style.display = 'inline-flex';
+    elements.stopNav.style.display = 'inline-flex';
+    
+    // Auto-hide directions panel on mobile during navigation
+    if (state.isMobile) {
+      setTimeout(() => {
+        if (elements.panel.style.display === 'block') {
+          elements.panel.style.display = 'none';
+        }
+      }, 5000);
+    }
     
     speak('Navigation started', true);
     startLocationTracking();
@@ -868,7 +1215,7 @@
     
     elements.navInfo.style.display = 'none';
     elements.speedIndicator.style.display = 'none';
-    elements.startNav.style.display = 'inline-block';
+    elements.startNav.style.display = 'inline-flex';
     elements.pauseNav.style.display = 'none';
     elements.stopNav.style.display = 'none';
     elements.pauseNav.textContent = '⏸ Pause';
@@ -882,13 +1229,15 @@
     stopLocationTracking();
   }
 
-  // --- Event Listeners ---
+  // --- Enhanced Event Listeners ---
   
   // Route planning
   elements.go.addEventListener('click', async () => {
     try {
       elements.go.disabled = true;
       elements.go.textContent = 'Routing…';
+      elements.go.classList.add('loading');
+      
       const fromLL = await geocodeIfNeeded(elements.from);
       const toLL = await geocodeIfNeeded(elements.to);
       makeRoute(fromLL, toLL);
@@ -897,6 +1246,7 @@
     } finally {
       elements.go.disabled = false;
       elements.go.textContent = 'Route';
+      elements.go.classList.remove('loading');
     }
   });
 
@@ -907,6 +1257,10 @@
     elements.from.removeAttribute('data-lon');
     elements.to.removeAttribute('data-lat');
     elements.to.removeAttribute('data-lon');
+    
+    // Hide suggestions
+    elements.fromSug.style.display = 'none';
+    elements.toSug.style.display = 'none';
     
     if (state.routingControl) {
       map.removeControl(state.routingControl);
@@ -943,6 +1297,10 @@
       elements.to.removeAttribute('data-lat');
       elements.to.removeAttribute('data-lon');
     }
+    
+    // Hide suggestions after swap
+    elements.fromSug.style.display = 'none';
+    elements.toSug.style.display = 'none';
   });
 
   elements.useCur.addEventListener('click', () => {
@@ -950,6 +1308,9 @@
       alert('Geolocation not supported');
       return;
     }
+    
+    elements.useCur.disabled = true;
+    elements.useCur.textContent = 'Getting…';
     
     navigator.geolocation.getCurrentPosition(async pos => {
       const position = L.latLng(pos.coords.latitude, pos.coords.longitude);
@@ -973,9 +1334,16 @@
         elements.from.dataset.lat = position.lat;
         elements.from.dataset.lon = position.lng;
       }
-    }, err => alert(err.message), {
+      
+      elements.useCur.disabled = false;
+      elements.useCur.textContent = '📍';
+    }, err => {
+      alert(`Location error: ${err.message}`);
+      elements.useCur.disabled = false;
+      elements.useCur.textContent = '📍';
+    }, {
       enableHighAccuracy: true,
-      timeout: 10000
+      timeout: 15000
     });
   });
 
@@ -987,12 +1355,14 @@
   elements.mute.addEventListener('click', () => {
     state.voiceMuted = !state.voiceMuted;
     elements.mute.textContent = state.voiceMuted ? '🔇' : '🔊';
+    elements.mute.title = state.voiceMuted ? 'Unmute' : 'Mute';
     speak(state.voiceMuted ? 'Voice muted' : 'Voice unmuted');
   });
 
   elements.recenter.addEventListener('click', () => {
     state.followUser = !state.followUser;
     elements.recenter.textContent = state.followUser ? '🎯' : '👁️';
+    elements.recenter.title = state.followUser ? 'Following' : 'Free View';
     
     if (state.followUser && state.userPosition) {
       map.setView(state.userPosition, Math.max(16, map.getZoom()));
@@ -1009,18 +1379,34 @@
     elements.navInfo.style.display = 'none';
   });
 
-  // Keyboard shortcuts
+  // Enhanced keyboard shortcuts
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      elements.go.click();
-    } else if (e.key === 'Escape') {
-      if (state.navActive) stopNavigation();
+    if (e.target.tagName === 'INPUT') return; // Don't interfere with input fields
+    
+    switch(e.key) {
+      case 'Enter':
+        if (!state.navActive) elements.go.click();
+        break;
+      case 'Escape':
+        if (state.navActive) stopNavigation();
+        else if (elements.panel.style.display === 'block') {
+          elements.panel.style.display = 'none';
+        }
+        break;
+      case ' ': // Spacebar
+        e.preventDefault();
+        if (state.navActive) pauseNavigation();
+        break;
+      case 'c':
+      case 'C':
+        elements.clear.click();
+        break;
     }
   });
 
-  // Map interactions
+  // Enhanced map interactions
   map.on('click', async (e) => {
-    if (!elements.to.value) {
+    if (!elements.to.value.trim()) {
       const position = e.latlng;
       try {
         const result = await reverseGeocode(position);
@@ -1029,6 +1415,11 @@
         elements.to.value = label;
         elements.to.dataset.lat = position.lat;
         elements.to.dataset.lon = position.lng;
+        
+        // Auto-focus the route button on mobile after selecting destination
+        if (state.isMobile && elements.from.value.trim()) {
+          elements.go.focus();
+        }
       } catch {
         elements.to.value = `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`;
         elements.to.dataset.lat = position.lat;
@@ -1042,31 +1433,121 @@
     if (state.followUser) {
       state.followUser = false;
       elements.recenter.textContent = '👁️';
+      elements.recenter.title = 'Free View';
     }
   });
 
-  // Auto-hide navigation info on small screens when not needed
+  // Enhanced resize handling
   function handleResize() {
-    if (window.innerWidth < 768 && elements.panel.style.display === 'block') {
+    const newIsMobile = window.innerWidth <= 768;
+    
+    if (newIsMobile !== state.isMobile) {
+      state.isMobile = newIsMobile;
+      updateMobileState();
+    }
+    
+    // Adjust map size
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+  }
+
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', () => {
+    setTimeout(handleResize, 500);
+  });
+
+  // Handle visibility change (when app goes to background/foreground)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // App went to background - reduce location update frequency
+      if (state.watchId) {
+        stopLocationTracking();
+      }
+    } else {
+      // App came to foreground - resume normal operation
+      if (state.navActive && !state.navPaused) {
+        startLocationTracking();
+      }
+    }
+  });
+
+  // Touch and interaction improvements
+  function addTouchFeedback(element) {
+    element.addEventListener('touchstart', function(e) {
+      this.style.transform = 'scale(0.98)';
+      this.style.opacity = '0.8';
+    });
+    
+    element.addEventListener('touchend', function(e) {
+      this.style.transform = '';
+      this.style.opacity = '';
+    });
+    
+    element.addEventListener('touchcancel', function(e) {
+      this.style.transform = '';
+      this.style.opacity = '';
+    });
+  }
+
+  // Add touch feedback to all buttons
+  document.querySelectorAll('button').forEach(addTouchFeedback);
+
+  // Prevent zoom on double tap for better UX
+  let lastTap = 0;
+  document.addEventListener('touchend', function (e) {
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    if (tapLength < 500 && tapLength > 0) {
+      e.preventDefault();
+    }
+    lastTap = currentTime;
+  });
+
+  // Initialize
+  updateMobileState();
+  handleResize();
+
+  // PWA support - register service worker if available
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log('SW registered'))
+        .catch(() => console.log('SW registration failed'));
+    });
+  }
+
+  // Handle network status
+  function updateOnlineStatus() {
+    if (!navigator.onLine) {
+      const offlineNotice = document.createElement('div');
+      offlineNotice.className = 'offline-notice';
+      offlineNotice.textContent = 'Offline - Limited functionality';
+      offlineNotice.style.cssText = `
+        position: fixed;
+        top: calc(var(--top-height) + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #f59e0b;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        z-index: 9999;
+        font-size: 12px;
+        font-weight: 600;
+      `;
+      document.body.appendChild(offlineNotice);
+      
       setTimeout(() => {
-        if (!state.navActive) {
-          elements.panel.style.display = 'none';
+        if (offlineNotice.parentNode) {
+          offlineNotice.remove();
         }
       }, 5000);
     }
   }
 
-  window.addEventListener('resize', handleResize);
-  
-  // Initialize
-  handleResize();
-  
-  // Service Worker for offline functionality (optional)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Service worker registration failed, continue without offline support
-    });
-  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
 
 </script>
 </body>
