@@ -1,294 +1,440 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Navigation Map</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web Map – Live Navigation (OSM)</title>
+
+<!-- Leaflet core -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet Routing Machine (for route + instructions) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<!-- Minimal styles -->
 <style>
-    body, html {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        font-family: Arial, sans-serif;
-    }
-    #map {
-        height: 100%;
-        width: 100%;
-    }
-    .controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: white;
-        padding: 10px;
-        border-radius: 8px;
-        box-shadow: 0px 2px 6px rgba(0,0,0,0.3);
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        width: 90%;
-        max-width: 300px;
-    }
-    .controls input, .controls button {
-        padding: 8px;
-        font-size: 14px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        outline: none;
-    }
-    .controls button {
-        background: #007bff;
-        color: white;
-        cursor: pointer;
-        border: none;
-    }
-    .controls button:hover {
-        background: #0056b3;
-    }
-    .info-panel {
-        position: absolute;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.7);
-        color: white;
-        padding: 8px 15px;
-        border-radius: 6px;
-        font-size: 14px;
-        z-index: 1000;
-    }
-    .leaflet-routing-container {
-        margin-top: 140px !important;
-    }
-    @media (max-width: 600px) {
-        .controls {
-            max-width: 90%;
-            font-size: 12px;
-        }
-        .controls input, .controls button {
-            font-size: 12px;
-            padding: 6px;
-        }
-        .leaflet-routing-container {
-            margin-top: 190px !important;
-        }
-    }
-    /* Blue animated route style */
-    .animated-route {
-        stroke-dasharray: 10;
-        animation: dash 1s linear infinite;
-    }
-    @keyframes dash {
-        to {
-            stroke-dashoffset: -20;
-        }
-    }
+  :root{
+    --bg: rgba(255,255,255,.95);
+    --shadow: 0 10px 30px rgba(0,0,0,.15);
+    --radius: 14px;
+    --accent: #2563eb; /* blue */
+    --green: #10b981;  /* emerald */
+    --dark: #111827;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827}
+  #map{position:absolute;inset:0}
+
+  /* Top controls */
+  .card{
+    position:fixed; z-index:1000; left:50%; transform:translateX(-50%);
+    top:10px; width:min(980px,94vw);
+    background:var(--bg); backdrop-filter:blur(10px); box-shadow:var(--shadow);
+    border-radius:var(--radius); padding:10px;
+  }
+  .row{display:grid; grid-template-columns:1fr auto auto auto; gap:7px; align-items:center}
+  .row2{display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:6px}
+  .wrap{position:relative}
+  input[type="text"]{
+    width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px;
+    font-size:14px; outline:none; background:#fff;
+  }
+  input[type="text"]:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  button{
+    padding:10px 12px; border:0; border-radius:10px; cursor:pointer; font-weight:600;
+    background:var(--dark); color:#fff;
+  }
+  .btn{background:#e5e7eb;color:#111827}
+  .accent{background:var(--accent); color:#fff}
+  .green{background:var(--green); color:#fff}
+  .danger{background:#ef4444; color:#fff}
+  .muted{color:#6b7280; font-size:12px}
+
+  /* Suggestions dropdown */
+  .sug{
+    position:absolute; left:0; right:0; top:calc(100% + 6px);
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:var(--shadow);
+    max-height:260px; overflow:auto; z-index:2000; display:none;
+  }
+  .s-item{padding:10px 12px; cursor:pointer}
+  .s-item:hover{background:#f3f4f6}
+  .s-sub{display:block; font-size:12px; color:#6b7280; margin-top:2px}
+
+  /* Directions / nav panel (mobile friendly) */
+  .panel{
+    position:fixed; right:10px; top:10px; bottom:10px; width:min(360px,86vw);
+    background:var(--bg); backdrop-filter:blur(10px); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:12px; z-index:900; overflow:auto; display:none;
+  }
+  .panel h3{margin:0 0 6px 0}
+  .badge{display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:700; font-size:12px; margin-right:6px}
+  ol{margin:8px 0 0 22px; padding:0}
+  li{margin:6px 0; line-height:1.35}
+
+  /* Nav bar on the bottom for mobile */
+  .navbar{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:10px;
+    display:flex; gap:8px; z-index:950;
+    background:var(--bg); box-shadow:var(--shadow); border-radius:999px; padding:8px
+  }
+
+  /* Responsive */
+  @media (max-width:720px){
+    .row{grid-template-columns:1fr}
+    .row2{grid-template-columns:1fr}
+    .panel{right:unset; left:10px; width:calc(100vw - 20px)}
+  }
 </style>
 </head>
 <body>
-
 <div id="map"></div>
 
-<div class="controls">
-    <input type="text" id="from" placeholder="From (place or lat,lon)">
-    <input type="text" id="to" placeholder="To (place or lat,lon)">
-    <button onclick="setCurrentLocation()">📍 Use Current Location</button>
-    <button onclick="getRoute()">🚗 Get Directions</button>
-    <button onclick="startLiveNavigation()">📡 Start Live Navigation</button>
+<!-- TOP BAR -->
+<div class="card">
+  <div class="row">
+    <div class="wrap">
+      <input id="from" type="text" placeholder="From (place or lat,lon)" autocomplete="off">
+      <div id="fromSug" class="sug"></div>
+    </div>
+    <button id="swap" class="btn" title="Swap">⇄</button>
+    <button id="useCur" class="green" title="Use current">📍 Current</button>
+    <button id="go" class="accent">Get Directions</button>
+  </div>
+  <div class="row2">
+    <div class="wrap">
+      <input id="to" type="text" placeholder="To (place or lat,lon)" autocomplete="off">
+      <div id="toSug" class="sug"></div>
+    </div>
+    <button id="clear" class="btn">Clear</button>
+  </div>
+  <div class="muted" style="margin-top:6px">Tip: press <strong>Enter</strong> to route • tap map to set destination quickly</div>
 </div>
 
-<div class="info-panel" id="infoPanel" style="display:none;">
-    Distance: <span id="distance"></span> | ETA: <span id="eta"></span>
+<!-- DIRECTIONS PANEL -->
+<div id="panel" class="panel">
+  <h3>Route</h3>
+  <div id="summary" class="muted"></div>
+  <ol id="steps"></ol>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<!-- NAV CONTROLS (bottom) -->
+<div class="navbar">
+  <button id="startNav" class="green">▶ Start Nav</button>
+  <button id="pauseNav" class="btn">⏸ Pause</button>
+  <button id="stopNav" class="danger">■ Stop</button>
+  <button id="mute" class="btn" title="Mute/Unmute">🔊</button>
+  <button id="recenter" class="btn" title="Re-center">🎯</button>
+</div>
 
 <script>
-let map = L.map('map').setView([20.5937, 78.9629], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+  // --- Map setup ---
+  const map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5); // India default
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
 
-let routingControl;
-let userMarker;
-let watchId;
-let toCoordsGlobal = null;
-let animatedPolyline;
-let currentRotation = 0;
+  // --- UI elements ---
+  const fromEl = document.getElementById('from');
+  const toEl = document.getElementById('to');
+  const fromSug = document.getElementById('fromSug');
+  const toSug = document.getElementById('toSug');
+  const goBtn = document.getElementById('go');
+  const clearBtn = document.getElementById('clear');
+  const swapBtn = document.getElementById('swap');
+  const useCurBtn = document.getElementById('useCur');
+  const panel = document.getElementById('panel');
+  const summaryEl = document.getElementById('summary');
+  const stepsEl = document.getElementById('steps');
 
-// Custom GPS arrow icon
-let arrowIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
-    iconSize: [35, 35],
-    iconAnchor: [17, 17]
-});
+  const startNavBtn = document.getElementById('startNav');
+  const pauseNavBtn = document.getElementById('pauseNav');
+  const stopNavBtn = document.getElementById('stopNav');
+  const muteBtn = document.getElementById('mute');
+  const recenterBtn = document.getElementById('recenter');
 
-// Geocode function
-function geocode(query, callback) {
-    if (query.includes(",")) {
-        let parts = query.split(",");
-        callback({ lat: parseFloat(parts[0]), lon: parseFloat(parts[1]) });
-    } else {
-        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.length > 0) callback(data[0]);
-            else alert("Location not found");
-        });
-    }
-}
+  // --- State ---
+  let routingControl = null;
+  let currentRoute = null;       // LRM route object + coordinates + instructions
+  let routeLine = null;          // Polyline drawn by LRM; we will rely on LRM
+  let userMarker = null;
+  let watchId = null;
+  let navActive = false;
+  let navPaused = false;
+  let voiceMuted = false;
+  let nextInstructionIdx = 0;    // index in instructions array
+  let followUser = true;
 
-// Set current location
-function setCurrentLocation() {
-    navigator.geolocation.getCurrentPosition(pos => {
-        let lat = pos.coords.latitude;
-        let lon = pos.coords.longitude;
-        document.getElementById("from").value = `${lat},${lon}`;
-        map.setView([lat, lon], 14);
-        if (userMarker) map.removeLayer(userMarker);
-        userMarker = L.marker([lat, lon], { icon: arrowIcon }).addTo(map).bindPopup("You are here").openPopup();
-    }, () => {
-        alert("Unable to get location");
+  // --- Helpers ---
+  function parseLatLon(text){
+    const parts = text.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && parts.every(n => !Number.isNaN(n))) return L.latLng(parts[0], parts[1]);
+    return null;
+  }
+  async function photonSearch(q){
+    const url = new URL('https://photon.komoot.io/api/');
+    url.searchParams.set('q', q); url.searchParams.set('limit','8');
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('search failed');
+    return res.json();
+  }
+  function renderSuggestions(box, features, onPick){
+    box.innerHTML = '';
+    if(!features || !features.length){ box.style.display = 'none'; return; }
+    features.forEach(f=>{
+      const name = f.properties.name || f.properties.street || 'Unnamed';
+      const ctx = [f.properties.city, f.properties.state, f.properties.country].filter(Boolean).join(', ');
+      const div = document.createElement('div');
+      div.className = 's-item';
+      div.innerHTML = `${name}<span class="s-sub">${ctx}</span>`;
+      div.addEventListener('click', () => onPick(f));
+      box.appendChild(div);
     });
-}
+    box.style.display = 'block';
+  }
+  function attachAutocomplete(input, box){
+    let t;
+    input.addEventListener('input', ()=>{
+      input.removeAttribute('data-lat'); input.removeAttribute('data-lon');
+      const q = input.value.trim();
+      clearTimeout(t);
+      if(q.length < 2){ box.style.display='none'; return; }
+      t = setTimeout(async ()=>{
+        try{
+          const data = await photonSearch(q);
+          renderSuggestions(box, data.features, (f)=>{
+            const [lon, lat] = f.geometry.coordinates;
+            input.dataset.lat = lat; input.dataset.lon = lon;
+            const label = (f.properties.name||'') + (f.properties.city?`, ${f.properties.city}`:'') + (f.properties.country?`, ${f.properties.country}`:'');
+            input.value = label;
+            box.style.display = 'none';
+          });
+        }catch{ box.style.display='none'; }
+      }, 200);
+    });
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter' && box.firstChild){ e.preventDefault(); box.firstChild.click(); }
+    });
+    document.addEventListener('click', e=>{ if(!box.contains(e.target) && e.target !== input) box.style.display='none'; });
+  }
+  attachAutocomplete(fromEl, fromSug);
+  attachAutocomplete(toEl, toSug);
 
-// Draw animated blue route
-function drawAnimatedRoute(coords) {
-    if (animatedPolyline) map.removeLayer(animatedPolyline);
-    animatedPolyline = L.polyline(coords, {
-        color: '#007bff',
-        weight: 6,
-        className: 'animated-route'
+  async function geocodeIfNeeded(input){
+    if(input.dataset.lat && input.dataset.lon) return L.latLng(parseFloat(input.dataset.lat), parseFloat(input.dataset.lon));
+    const parsed = parseLatLon(input.value.trim());
+    if(parsed) return parsed;
+    // fallback geocode via Photon (first result)
+    const j = await photonSearch(input.value.trim());
+    if(!j.features || !j.features[0]) throw new Error('Place not found: ' + input.value.trim());
+    const [lon, lat] = j.features[0].geometry.coordinates;
+    input.dataset.lat = lat; input.dataset.lon = lon;
+    return L.latLng(lat, lon);
+  }
+
+  async function reverseGeocode(latlng){
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format','jsonv2');
+    url.searchParams.set('lat', latlng.lat);
+    url.searchParams.set('lon', latlng.lng);
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' }});
+    if(!res.ok) return null;
+    return res.json();
+  }
+
+  // --- Routing via Leaflet Routing Machine (OSRM) ---
+  function makeRoute(fromLL, toLL){
+    if(routingControl){ map.removeControl(routingControl); routingControl = null; }
+    routingControl = L.Routing.control({
+      waypoints: [fromLL, toLL],
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      routeWhileDragging: false,
+      addWaypoints: false,
+      showAlternatives: false,
+      show: false, // hide LRM's default panel
+      lineOptions: { styles:[{color:'#2563eb', opacity:0.9, weight:6}] },
+      createMarker: function(i, wp, n){ // our own nice markers
+        return L.marker(wp.latLng, { draggable:false });
+      }
     }).addTo(map);
-}
 
-// Get route
-function getRoute() {
-    let from = document.getElementById("from").value;
-    let to = document.getElementById("to").value;
-    if (!from || !to) {
-        alert("Please enter both locations");
-        return;
-    }
-
-    geocode(from, fromCoords => {
-        geocode(to, toCoords => {
-            toCoordsGlobal = toCoords;
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(fromCoords.lat, fromCoords.lon),
-                    L.latLng(toCoords.lat, toCoords.lon)
-                ],
-                routeWhileDragging: true,
-                geocoder: L.Control.Geocoder.nominatim(),
-                addWaypoints: false
-            }).on('routesfound', function(e) {
-                let route = e.routes[0];
-                updateInfo(route.summary.totalDistance, route.summary.totalTime);
-                speakDirections(route.instructions || []);
-                drawAnimatedRoute(route.coordinates);
-            }).addTo(map);
-        });
+    routingControl.on('routesfound', e=>{
+      currentRoute = e.routes[0]; // LRM route with .instructions and .coordinates
+      nextInstructionIdx = 0;
+      // Fit bounds
+      const ll = L.latLngBounds(currentRoute.coordinates);
+      map.fitBounds(ll, { padding:[60,60] });
+      // Fill panel
+      renderRoutePanel(currentRoute);
+      panel.style.display = 'block';
     });
-}
 
-// Update ETA & distance
-function updateInfo(distanceMeters, timeSeconds) {
-    document.getElementById("infoPanel").style.display = "block";
-    let distanceKm = (distanceMeters / 1000).toFixed(2) + " km";
-    let etaMin = Math.round(timeSeconds / 60) + " mins";
-    document.getElementById("distance").innerText = distanceKm;
-    document.getElementById("eta").innerText = etaMin;
-}
+    routingControl.on('routingerror', ()=> alert('Routing failed. Try different points.'));
+  }
 
-// Voice directions
-function speakDirections(instructions) {
-    let utterance = new SpeechSynthesisUtterance();
-    utterance.lang = 'en-US';
-    instructions.forEach(inst => {
-        utterance.text = inst.text;
-        speechSynthesis.speak(utterance);
+  function renderRoutePanel(route){
+    const km = (route.summary.totalDistance/1000).toFixed(1);
+    const min = Math.round(route.summary.totalTime/60);
+    summaryEl.innerHTML = `<span class="badge">${km} km</span><span class="badge">~${min} min</span> Turn-by-turn:`;
+    stepsEl.innerHTML = '';
+    (route.instructions || []).forEach(ins=>{
+      const li = document.createElement('li');
+      li.textContent = ins.text;
+      stepsEl.appendChild(li);
     });
-}
+  }
 
-// Calculate heading between two points
-function getBearing(lat1, lon1, lat2, lon2) {
-    let dLon = (lon2 - lon1) * Math.PI / 180;
-    lat1 = lat1 * Math.PI / 180;
-    lat2 = lat2 * Math.PI / 180;
-    let y = Math.sin(dLon) * Math.cos(lat2);
-    let x = Math.cos(lat1) * Math.sin(lat2) -
-            Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    let brng = Math.atan2(y, x) * 180 / Math.PI;
-    return (brng + 360) % 360;
-}
+  // --- Voice (SpeechSynthesis) ---
+  function speak(text){
+    if(voiceMuted || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-IN'; // Indian English vibe; change if you prefer
+    u.rate = 1.05;
+    window.speechSynthesis.cancel(); // replace pending
+    window.speechSynthesis.speak(u);
+  }
 
-// Smooth rotation
-function smoothRotate(newRotation) {
-    let diff = (newRotation - currentRotation + 540) % 360 - 180;
-    currentRotation = (currentRotation + diff * 0.2) % 360; // Smooth factor
-    return currentRotation;
-}
+  function distance(a,b){ return map.distance(a,b); }
 
-// Live navigation
-function startLiveNavigation() {
-    if (!document.getElementById("to").value) {
-        alert("Enter destination first");
-        return;
+  // Decide when to announce next instruction:
+  // Use route.coordinates[ins.index] as the "turn point".
+  function handleNavUpdate(userLL){
+    if(!navActive || !currentRoute) return;
+    const instr = currentRoute.instructions || [];
+    if(nextInstructionIdx >= instr.length) return;
+
+    const turnPoint = currentRoute.coordinates[instr[nextInstructionIdx].index];
+    const d = distance(userLL, turnPoint);
+
+    // Announce at ~120 m, and again at ~30 m before the turn (typical nav behavior)
+    const current = instr[nextInstructionIdx];
+    if(d < 30){
+      speak(current.text);
+      nextInstructionIdx++;
+    } else if(d < 120 && !current._preAnnounced){
+      speak('In ' + Math.max(30, Math.round(d/10)*10) + ' meters, ' + current.text);
+      current._preAnnounced = true;
     }
-    if (watchId) navigator.geolocation.clearWatch(watchId);
+  }
 
-    let lastLat = null, lastLon = null;
+  // --- Geolocation / live tracking ---
+  function startWatch(){
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    if(!navigator.geolocation){ alert('Geolocation not supported'); return; }
+    watchId = navigator.geolocation.watchPosition(pos=>{
+      const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      if(!userMarker){
+        userMarker = L.marker(ll, {
+          icon: L.icon({ iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41] })
+        }).addTo(map).bindPopup('You are here');
+      } else {
+        userMarker.setLatLng(ll);
+      }
+      if(followUser) map.setView(ll, Math.max(15, map.getZoom()), { animate:true });
 
-    watchId = navigator.geolocation.watchPosition(pos => {
-        let lat = pos.coords.latitude;
-        let lon = pos.coords.longitude;
+      // During navigation, evaluate next turn proximity
+      handleNavUpdate(ll);
+    }, err=>{
+      alert('Location error: ' + err.message);
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  }
+  function stopWatch(){
+    if(watchId){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+  }
 
-        let rotation = 0;
-        if (lastLat !== null && lastLon !== null) {
-            rotation = getBearing(lastLat, lastLon, lat, lon);
-            rotation = smoothRotate(rotation);
-        }
-        lastLat = lat;
-        lastLon = lon;
+  // --- Buttons ---
+  goBtn.addEventListener('click', async ()=>{
+    try{
+      goBtn.disabled = true; goBtn.textContent = 'Routing…';
+      const fromLL = await geocodeIfNeeded(fromEl);
+      const toLL   = await geocodeIfNeeded(toEl);
+      makeRoute(fromLL, toLL);
+    }catch(e){ alert(e.message || 'Failed to route'); }
+    finally{ goBtn.disabled = false; goBtn.textContent = 'Get Directions'; }
+  });
 
-        if (userMarker) map.removeLayer(userMarker);
-        userMarker = L.marker([lat, lon], {
-            icon: arrowIcon,
-            rotationAngle: rotation
-        }).addTo(map);
+  clearBtn.addEventListener('click', ()=>{
+    fromEl.value = ''; toEl.value = '';
+    fromEl.removeAttribute('data-lat'); fromEl.removeAttribute('data-lon');
+    toEl.removeAttribute('data-lat'); toEl.removeAttribute('data-lon');
+    if(routingControl){ map.removeControl(routingControl); routingControl = null; }
+    currentRoute = null; nextInstructionIdx = 0;
+    panel.style.display = 'none';
+  });
 
-        map.setView([lat, lon], 16);
+  swapBtn.addEventListener('click', ()=>{
+    const v1 = fromEl.value, v2 = toEl.value;
+    const la1 = fromEl.dataset.lat, lo1 = fromEl.dataset.lon;
+    const la2 = toEl.dataset.lat, lo2 = toEl.dataset.lon;
+    fromEl.value = v2; toEl.value = v1;
+    if(la2 && lo2){ fromEl.dataset.lat = la2; fromEl.dataset.lon = lo2; } else { fromEl.removeAttribute('data-lat'); fromEl.removeAttribute('data-lon'); }
+    if(la1 && lo1){ toEl.dataset.lat = la1; toEl.dataset.lon = lo1; } else { toEl.removeAttribute('data-lat'); toEl.removeAttribute('data-lon'); }
+  });
 
-        if (toCoordsGlobal) {
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(lat, lon),
-                    L.latLng(toCoordsGlobal.lat, toCoordsGlobal.lon)
-                ],
-                routeWhileDragging: false,
-                geocoder: L.Control.Geocoder.nominatim(),
-                addWaypoints: false
-            }).on('routesfound', function(e) {
-                let route = e.routes[0];
-                updateInfo(route.summary.totalDistance, route.summary.totalTime);
-                speakDirections(route.instructions || []);
-                drawAnimatedRoute(route.coordinates);
-            }).addTo(map);
-        }
-    }, () => {
-        alert("Error in live tracking");
-    }, { enableHighAccuracy: true });
-}
+  useCurBtn.addEventListener('click', ()=>{
+    if(!navigator.geolocation) return alert('Geolocation not supported');
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      map.setView(ll, 14);
+      if(userMarker) userMarker.setLatLng(ll); else userMarker = L.marker(ll).addTo(map).bindPopup('You are here').openPopup();
+      try{
+        const r = await reverseGeocode(ll);
+        const label = r?.display_name || `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        fromEl.value = label; fromEl.dataset.lat = ll.lat; fromEl.dataset.lon = ll.lng;
+      }catch{
+        fromEl.value = `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`; fromEl.dataset.lat = ll.lat; fromEl.dataset.lon = ll.lng;
+      }
+    }, err=> alert(err.message), { enableHighAccuracy:true, timeout:20000 });
+  });
+
+  // Start/Pause/Stop live navigation
+  startNavBtn.addEventListener('click', ()=>{
+    if(!currentRoute){ alert('Get a route first'); return; }
+    navActive = true; navPaused = false; followUser = true;
+    speak('Starting navigation');
+    startWatch();
+  });
+  pauseNavBtn.addEventListener('click', ()=>{
+    if(!navActive) return;
+    navPaused = !navPaused;
+    if(navPaused){ speak('Navigation paused'); stopWatch(); pauseNavBtn.textContent = '▶ Resume'; }
+    else { speak('Resuming navigation'); startWatch(); pauseNavBtn.textContent = '⏸ Pause'; }
+  });
+  stopNavBtn.addEventListener('click', ()=>{
+    if(!navActive) return;
+    navActive = false; navPaused = false; followUser = false; nextInstructionIdx = 0;
+    speak('Navigation stopped');
+    stopWatch();
+    pauseNavBtn.textContent = '⏸ Pause';
+  });
+  muteBtn.addEventListener('click', ()=>{
+    voiceMuted = !voiceMuted;
+    muteBtn.textContent = voiceMuted ? '🔇' : '🔊';
+  });
+  recenterBtn.addEventListener('click', ()=>{ followUser = true; if(userMarker) map.setView(userMarker.getLatLng(), Math.max(15, map.getZoom())); });
+
+  // Quick UX: pressing Enter triggers routing
+  document.addEventListener('keydown', e=>{ if(e.key === 'Enter') goBtn.click(); });
+
+  // Tap on map to set destination quickly if empty
+  map.on('click', async (e)=>{
+    if(!toEl.value){
+      const ll = e.latlng;
+      try{
+        const r = await reverseGeocode(ll);
+        const label = r?.display_name || `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        toEl.value = label; toEl.dataset.lat = ll.lat; toEl.dataset.lon = ll.lng;
+      }catch{
+        toEl.value = `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`; toEl.dataset.lat = ll.lat; toEl.dataset.lon = ll.lng;
+      }
+    }
+  });
+
+  // If user manually moves map during nav, stop auto-follow until recenter
+  map.on('movestart', ()=>{ followUser = false; });
+
 </script>
-
 </body>
 </html>
