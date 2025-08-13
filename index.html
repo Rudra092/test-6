@@ -821,18 +821,29 @@
                 return;
             }
 
+            // Add "Use current location" as first option
+            let suggestionHTML = '';
+            if (userLocation) {
+                suggestionHTML += `<div class="suggestion-item" onclick="selectLocation('${input.id}', 'Current Location', ${userLocation.lat}, ${userLocation.lon}, '${suggestionsId}')">
+                    <span class="suggestion-icon">📍</span>
+                    <span>Use current location</span>
+                </div>`;
+            }
+
             const filtered = sampleLocations.filter(location => 
                 location.name.toLowerCase().includes(query)
             ).slice(0, 5);
 
-            suggestions.innerHTML = filtered.map(location => 
-                `<div class="suggestion-item" onclick="selectLocation('${input.id}', '${location.name}', ${location.lat}, ${location.lon}, '${suggestionsId}')">
-                    <span class="suggestion-icon">📍</span>
+            suggestionHTML += filtered.map(location => 
+                `<div class="suggestion-item" onclick="selectLocation('${input.id}', '${location.name.replace(/'/g, "&apos;")}', ${location.lat}, ${location.lon}, '${suggestionsId}')">
+                    <span class="suggestion-icon">🏢</span>
                     <span>${location.name}</span>
                 </div>`
             ).join('');
 
-            if (filtered.length > 0) {
+            suggestions.innerHTML = suggestionHTML;
+
+            if (suggestionHTML) {
                 suggestions.classList.add('active');
             }
         }
@@ -842,10 +853,14 @@
             document.getElementById(inputId).value = name;
             document.getElementById(suggestionsId).classList.remove('active');
             
+            const locationData = { lat: parseFloat(lat), lon: parseFloat(lon), name: name };
+            
             if (inputId === 'fromInput') {
-                fromLocation = { lat, lon, name };
+                fromLocation = locationData;
+                console.log('From location set:', fromLocation);
             } else {
-                toLocation = { lat, lon, name };
+                toLocation = locationData;
+                console.log('To location set:', toLocation);
             }
             
             checkForRoute();
@@ -854,7 +869,8 @@
         // Use current location
         function useCurrentLocation(type) {
             if (!userLocation) {
-                updateStatus('Location not available');
+                updateStatus('Getting location...');
+                getUserLocation();
                 return;
             }
             
@@ -862,9 +878,11 @@
             document.getElementById(inputId).value = 'Current Location';
             
             if (type === 'from') {
-                fromLocation = { ...userLocation, name: 'Current Location' };
+                fromLocation = { lat: userLocation.lat, lon: userLocation.lon, name: 'Current Location' };
+                console.log('From location set to current:', fromLocation);
             } else {
-                toLocation = { ...userLocation, name: 'Current Location' };
+                toLocation = { lat: userLocation.lat, lon: userLocation.lon, name: 'Current Location' };
+                console.log('To location set to current:', toLocation);
             }
             
             checkForRoute();
@@ -872,9 +890,20 @@
 
         // Check if we can show route
         function checkForRoute() {
-            if (fromLocation && toLocation) {
+            console.log('Checking for route:', { fromLocation, toLocation });
+            
+            if (fromLocation && toLocation && 
+                fromLocation.lat && fromLocation.lon && 
+                toLocation.lat && toLocation.lon) {
+                
                 document.getElementById('directionsBtn').innerHTML = '🧭 Get Directions';
                 document.getElementById('directionsBtn').style.background = '#1a73e8';
+                document.getElementById('directionsBtn').style.color = 'white';
+                updateStatus('Ready to navigate');
+            } else {
+                document.getElementById('directionsBtn').innerHTML = '🧭 Directions';
+                document.getElementById('directionsBtn').style.background = '#f1f3f4';
+                document.getElementById('directionsBtn').style.color = '#5f6368';
             }
         }
 
@@ -920,8 +949,15 @@
 
         // Get directions
         function getDirections() {
+            console.log('Getting directions:', { fromLocation, toLocation });
+            
             if (!fromLocation || !toLocation) {
-                updateStatus('Please select start and destination');
+                updateStatus('Please select both start and destination');
+                return;
+            }
+            
+            if (!fromLocation.lat || !fromLocation.lon || !toLocation.lat || !toLocation.lon) {
+                updateStatus('Invalid location coordinates');
                 return;
             }
             
@@ -940,6 +976,64 @@
                 ],
                 routeWhileDragging: false,
                 addWaypoints: false,
+                createMarker: function(i, waypoint, n) {
+                    const isStart = i === 0;
+                    const className = isStart ? 'start-marker' : 'end-marker';
+                    return L.marker(waypoint.latLng, {
+                        icon: L.divIcon({
+                            className: className,
+                            html: '',
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8]
+                        })
+                    });
+                },
+                lineOptions: {
+                    styles: [{
+                        color: '#4285f4',
+                        weight: 5,
+                        opacity: 0.8
+                    }]
+                },
+                show: false,
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                })
+            }).addTo(map);
+            
+            routeControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update route info
+                const timeInMinutes = Math.round(summary.totalTime / 60);
+                const distanceInKm = (summary.totalDistance / 1000).toFixed(1);
+                
+                document.getElementById('routeTime').textContent = `${timeInMinutes} min`;
+                document.getElementById('routeDistance').textContent = `${distanceInKm} km`;
+                
+                // Show navigation button
+                document.getElementById('navigationBtn').style.display = 'block';
+                
+                // Update status
+                updateStatus('Route calculated');
+                
+                // Update directions button
+                document.getElementById('directionsBtn').innerHTML = '🔄 Update Route';
+                
+                // Fit map to show entire route
+                const group = new L.featureGroup([
+                    L.marker([fromLocation.lat, fromLocation.lon]),
+                    L.marker([toLocation.lat, toLocation.lon])
+                ]);
+                map.fitBounds(group.getBounds().pad(0.1));
+            });
+            
+            routeControl.on('routingerror', function(e) {
+                updateStatus('Could not find route');
+                console.error('Routing error:', e);
+            });
+        }
                 createMarker: function(i, waypoint, n) {
                     const isStart = i === 0;
                     const className = isStart ? 'start-marker' : 'end-marker';
@@ -1149,6 +1243,7 @@
         // Initialize the map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
+            addDemoLocations();
         });
 
         // Handle window resize
@@ -1158,28 +1253,52 @@
             }
         });
 
-        // Add some sample markers for demo
-        setTimeout(() => {
-            if (map && userLocation) {
-                // Add some nearby points of interest
-                const poi = [
-                    { name: 'Restaurant', lat: userLocation.lat + 0.01, lon: userLocation.lon + 0.01, icon: '🍽️' },
-                    { name: 'Gas Station', lat: userLocation.lat - 0.01, lon: userLocation.lon + 0.005, icon: '⛽' },
-                    { name: 'Hospital', lat: userLocation.lat + 0.005, lon: userLocation.lon - 0.01, icon: '🏥' }
-                ];
-                
-                poi.forEach(point => {
-                    L.marker([point.lat, point.lon], {
-                        icon: L.divIcon({
-                            className: 'poi-marker',
-                            html: `<div style="background: white; border: 2px solid #4285f4; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px;">${point.icon}</div>`,
-                            iconSize: [24, 24],
-                            iconAnchor: [12, 12]
-                        })
-                    }).addTo(map).bindPopup(point.name);
-                });
+        // Add some demo locations for easy testing
+        function addDemoLocations() {
+            if (!userLocation) return;
+            
+            // Add quick access buttons for demo
+            setTimeout(() => {
+                const demoSection = document.createElement('div');
+                demoSection.innerHTML = `
+                    <div style="padding: 16px 20px; border-top: 1px solid #e0e0e0; background: #f8f9fa;">
+                        <div style="font-size: 12px; color: #5f6368; margin-bottom: 8px;">Quick Demo:</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button onclick="setDemoRoute('nearby')" style="padding: 6px 12px; background: #e8f0fe; border: 1px solid #4285f4; border-radius: 16px; font-size: 11px; color: #1a73e8; cursor: pointer;">Nearby Route</button>
+                            <button onclick="setDemoRoute('city')" style="padding: 6px 12px; background: #e8f0fe; border: 1px solid #4285f4; border-radius: 16px; font-size: 11px; color: #1a73e8; cursor: pointer;">City Center</button>
+                        </div>
+                    </div>
+                `;
+                document.querySelector('.sidebar').appendChild(demoSection);
+            }, 3000);
+        }
+
+        // Set demo route
+        function setDemoRoute(type) {
+            if (!userLocation) {
+                getUserLocation();
+                return;
             }
-        }, 2000);
+            
+            fromLocation = { lat: userLocation.lat, lon: userLocation.lon, name: 'Current Location' };
+            document.getElementById('fromInput').value = 'Current Location';
+            
+            if (type === 'nearby') {
+                toLocation = { 
+                    lat: userLocation.lat + 0.01, 
+                    lon: userLocation.lon + 0.01, 
+                    name: 'Nearby Destination' 
+                };
+                document.getElementById('toInput').value = 'Nearby Destination';
+            } else if (type === 'city') {
+                // Use Times Square as demo destination
+                toLocation = { lat: 40.7580, lon: -73.9855, name: 'Times Square, New York' };
+                document.getElementById('toInput').value = 'Times Square, New York';
+            }
+            
+            checkForRoute();
+            updateStatus('Demo route ready - click Get Directions');
+        }
     </script>
 </body>
 </html>
