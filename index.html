@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Smart Navigation - Real-time GPS Navigation</title>
+
+<!-- Leaflet core -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Leaflet Routing Machine -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<style>
+  :root{
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --success: #10b981;
+    --success-dark: #059669;
+    --danger: #ef4444;
+    --danger-dark: #dc2626;
+    --warning: #f59e0b;
+    --bg-glass: rgba(255,255,255,0.95);
+    --bg-dark: rgba(17,24,39,0.95);
+    --shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    --shadow-lg: 0 25px 50px -12px rgba(0,0,0,0.25);
+    --radius: 16px;
+    --radius-sm: 12px;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --header-height: 160px;
+    --navbar-height: 70px;
+  }
+  
+  *{
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  html, body{
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #6366f1 !important;
+    overflow: hidden;
+  }
+  
+  #map{
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+  }
+
+  /* Enhanced Header */
+  .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--shadow);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 12px;
+    transition: transform 0.3s ease;
+  }
+
+  .header.hidden {
+    transform: translateY(-100%);
+  }
+
+  .search-container {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .search-group {
+    position: relative;
+    margin-bottom: 8px;
+  }
+
+  .search-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 14px 16px 14px 48px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-weight: 500;
+    outline: none;
+    background: #fff;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    -webkit-appearance: none;
+  }
+
+  .search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 44px;
+    text-decoration: none;
+  }
+
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    flex: 1;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-dark);
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: var(--text-primary);
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: var(--success-dark);
+  }
+
+  .btn-icon {
+    padding: 12px;
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .help-text {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* Enhanced Suggestions */
+  .suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 2000;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.15s ease;
+  }
+
+  .suggestion-item:hover {
+    background: #f8fafc;
+  }
+
+  .suggestion-item:last-child {
+    border-bottom: none;
+  }
+
+  .suggestion-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .suggestion-address {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+
+  /* Enhanced Navigation Info */
+  .nav-panel {
+    position: fixed;
+    top: calc(var(--header-height) + 12px);
+    left: 12px;
+    right: 12px;
+    z-index: 950;
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    display: none;
+    max-width: 600px;
+    margin: 0 auto;
+    animation: slideDown 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .nav-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .nav-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+  }
+
+  .badge.success {
+    background: linear-gradient(135deg, var(--success), var(--success-dark));
+  }
+
+  .badge.danger {
+    background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+  }
+
+  .next-instruction {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 12px 0;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .nav-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 12px;
+  }
+
+  .stat-item {
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    position: relative;
+  }
+
+  .stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+
+  .off-route-indicator {
+    background: var(--danger);
+    color: white;
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: none;
+    animation: pulse 1.5s infinite;
+  }
+
+  /* Enhanced Directions Panel */
+  .directions-panel {
+    position: fixed;
+    right: 12px;
+    top: calc(var(--header-height) + 12px);
+    bottom: calc(var(--navbar-height) + 24px);
+    width: min(380px, 45vw);
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    z-index: 900;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+  }
+
+  .directions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .directions-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .directions-summary {
+    margin-bottom: 16px;
+  }
+
+  .directions-list {
+    flex: 1;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .direction-step {
+    padding: 16px;
+    margin-bottom: 8px;
+    border-radius: var(--radius-sm);
+    background: #f8fafc;
+    border-left: 4px solid var(--border);
+    transition: all 0.2s ease;
+    line-height: 1.4;
+    position: relative;
+  }
+
+  .direction-step.current {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    border-left-color: var(--primary);
+    font-weight: 600;
+    transform: translateX(4px);
+  }
+
+  .direction-step.completed {
+    background: #f0fdf4;
+    border-left-color: var(--success);
+    opacity: 0.7;
+  }
+
+  .direction-distance {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: var(--primary);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  /* Enhanced Navigation Controls */
+  .navigation-controls {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 950;
+    background: var(--bg-dark);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 25px;
+    padding: 12px;
+    box-shadow: var(--shadow-lg);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .nav-btn {
+    padding: 14px 18px;
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 48px;
+    color: white;
+    position: relative;
+  }
+
+  .nav-btn.start {
+    background: var(--success);
+  }
+
+  .nav-btn.start:hover {
+    background: var(--success-dark);
+  }
+
+  .nav-btn.pause {
+    background: var(--warning);
+  }
+
+  .nav-btn.stop {
+    background: var(--danger);
+  }
+
+  .nav-btn.stop:hover {
+    background: var(--danger-dark);
+  }
+
+  .nav-btn.control {
+    background: #4b5563;
+  }
+
+  .nav-btn.control:hover {
+    background: #374151;
+  }
+
+  .nav-btn.control.active {
+    background: var(--primary);
+  }
+
+  .notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    font-weight: bold;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Speed Indicator */
+  .speed-indicator {
+    position: fixed;
+    bottom: calc(var(--navbar-height) + 24px);
+    right: 20px;
+    width: 80px;
+    height: 80px;
+    background: var(--bg-dark);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 50%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-lg);
+    z-index: 940;
+    color: white;
+  }
+
+  .speed-value {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .speed-unit {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.8;
+    margin-top: 2px;
+  }
+
+  /* Progress Bar */
+  .route-progress {
+    position: fixed;
+    top: calc(var(--header-height) - 4px);
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(229, 231, 235, 0.8);
+    z-index: 999;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), var(--warning));
+    width: 0%;
+    transition: width 0.5s ease;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* Custom Markers */
+  .user-marker {
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    border: 4px solid white;
+    border-radius: 50%;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+
+  .user-marker.moving {
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  .user-marker.off-route {
+    background: var(--danger);
+    animation: pulse 1s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: var(--shadow), 0 0 0 0 rgba(99, 102, 241, 0.7);
+    }
+    70% {
+      box-shadow: var(--shadow), 0 0 0 10px rgba(99, 102, 241, 0);
+    }
+    100% {
+      box-shadow: var(--shadow), 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+  }
+
+  .direction-arrow {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 12px solid var(--primary);
+    transition: transform 0.3s ease;
+  }
+
+  .start-marker {
+    font-size: 24px;
+  }
+
+  .end-marker {
+    font-size: 24px;
+  }
+
+  /* Status Toast */
+  .status-toast {
+    position: fixed;
+    top: calc(var(--header-height) + 20px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-dark);
+    color: white;
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    z-index: 1001;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+    transition: all 0.3s ease;
+  }
+
+  .status-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Mobile Responsive Design */
+  @media (max-width: 768px) {
+    :root {
+      --header-height: 180px;
+      --navbar-height: 80px;
+    }
+
+    .search-input {
+      font-size: 16px; /* Prevents zoom on iOS */
+      padding: 16px 16px 16px 48px;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+    }
+
+    .btn {
+      min-height: 48px;
+      font-size: 14px;
+    }
+
+    .directions-panel {
+      left: 12px;
+      right: 12px;
+      width: auto;
+      top: calc(var(--header-height) + 140px);
+      bottom: calc(var(--navbar-height) + 24px);
+    }
+
+    .nav-panel {
+      top: calc(var(--header-height) + 12px);
+    }
+
+    .navigation-controls {
+      bottom: 8px;
+      left: 8px;
+      right: 8px;
+      transform: none;
+      border-radius: var(--radius);
+      padding: 8px;
+      justify-content: space-around;
+    }
+
+    .nav-btn {
+      padding: 12px 14px;
+      font-size: 12px;
+      min-height: 44px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .speed-indicator {
+      bottom: calc(var(--navbar-height) + 16px);
+      right: 16px;
+      width: 70px;
+      height: 70px;
+    }
+
+    .speed-value {
+      font-size: 20px;
+    }
+
+    .suggestions {
+      max-height: 200px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .nav-panel {
+      left: 8px;
+      right: 8px;
+      padding: 16px;
+    }
+
+    .nav-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .navigation-controls {
+      left: 4px;
+      right: 4px;
+      padding: 6px;
+    }
+
+    .nav-btn {
+      padding: 10px 8px;
+      font-size: 11px;
+      min-height: 40px;
+    }
+
+    .directions-panel {
+      left: 8px;
+      right: 8px;
+    }
+  }
+
+  /* Hide elements when keyboard is open on mobile */
+  @media (max-height: 500px) {
+    .navigation-controls {
+      display: none;
+    }
+    
+    .speed-indicator {
+      display: none !important;
+    }
+  }
+
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-glass: rgba(17, 24, 39, 0.95);
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --border: #374151;
+    }
+    
+    .search-input {
+      background: #1f2937;
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+    
+    .suggestions {
+      background: #1f2937;
+      border-color: var(--border);
+    }
+    
+    .suggestion-item:hover {
+      background: #374151;
+    }
+    
+    .stat-item {
+      background: #374151;
+      border-color: #4b5563;
+    }
+    
+    .direction-step {
+      background: #374151;
+    }
+    
+    .direction-step.current {
+      background: linear-gradient(135deg, #1e40af, #3730a3);
+    }
+  }
+
+  /* Accessibility improvements */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Status Toast -->
+<div class="status-toast" id="statusToast">Status message</div>
+
+<!-- Route Progress Bar -->
+<div class="route-progress">
+  <div class="progress-bar" id="progressBar"></div>
+</div>
+
+<!-- Enhanced Header -->
+<div class="header" id="header">
+  <div class="search-container">
+    <div class="search-group">
+      <div class="search-icon">📍</div>
+      <input id="from" class="search-input" type="text" placeholder="Starting location" autocomplete="off">
+      <div id="fromSug" class="suggestions"></div>
+    </div>
+    
+    <div class="search-group">
+      <div class="search-icon">🎯</div>
+      <input id="to" class="search-input" type="text" placeholder="Where to?" autocomplete="off">
+      <div id="toSug" class="suggestions"></div>
+    </div>
+    
+    <div class="action-buttons">
+      <button id="go" class="btn btn-primary">
+        🗺️ Get Directions
+      </button>
+      <button id="swap" class="btn btn-secondary btn-icon" title="Swap locations">
+        ⇄
+      </button>
+      <button id="useCur" class="btn btn-success btn-icon" title="Use current location">
+        📱
+      </button>
+    </div>
+    
+    <div class="help-text">
+      Tap map to set destination • Press Enter to route
+    </div>
+  </div>
+</div>
+
+<!-- Enhanced Navigation Panel -->
+<div id="navPanel" class="nav-panel">
+  <div class="off-route-indicator" id="offRouteIndicator">
+    🚨 You're off route! Recalculating...
+  </div>
+  
+  <div class="nav-header">
+    <div class="nav-badges">
+      <div class="badge" id="navDistance">-- km</div>
+      <div class="badge success" id="navTime">-- min</div>
+      <div class="badge danger" id="offRouteDistance" style="display: none;">Off: --m</div>
+    </div>
+    <button id="closeNavPanel" class="btn btn-secondary btn-icon">✕</button>
+  </div>
+  
+  <div class="next-instruction" id="nextInstruction">
+    Get directions to start navigation
+  </div>
+  
+  <div class="nav-stats">
+    <div class="stat-item">
+      <div class="stat-value" id="currentSpeed">0</div>
+      <div class="stat-label">km/h</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="eta">--:--</div>
+      <div class="stat-label">ETA</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="remaining">--</div>
+      <div class="stat-label">remaining</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="accuracy">--</div>
+      <div class="stat-label">GPS accuracy</div>
+    </div>
+  </div>
+</div>
+
+<!-- Enhanced Directions Panel -->
+<div id="directionsPanel" class="directions-panel">
+  <div class="directions-header">
+    <h3 class="directions-title">Route Instructions</h3>
+    <button id="closeDirections" class="btn btn-secondary btn-icon">✕</button>
+  </div>
+  
+  <div class="directions-summary" id="routeSummary"></div>
+  
+  <ol class="directions-list" id="directionsList"></ol>
+</div>
+
+<!-- Enhanced Speed Indicator -->
+<div id="speedIndicator" class="speed-indicator">
+  <div class="speed-value" id="speedValue">0</div>
+  <div class="speed-unit">km/h</div>
+</div>
+
+<!-- Enhanced Navigation Controls -->
+<div class="navigation-controls">
+  <button id="startNav" class="nav-btn start">
+    ▶️ Navigate
+  </button>
+  <button id="pauseNav" class="nav-btn pause" style="display: none;">
+    ⏸️ Pause
+  </button>
+  <button id="stopNav" class="nav-btn stop" style="display: none;">
+    ⏹️ Stop
+  </button>
+  <button id="mute" class="nav-btn control" title="Voice">
+    🔊
+  </button>
+  <button id="recenter" class="nav-btn control active" title="Follow">
+    🎯
+    <div class="notification-badge" id="recenterNotification">!</div>
+  </button>
+  <button id="compass" class="nav-btn control" title="North up">
+    🧭
+  </button>
+  <button id="clear" class="nav-btn control" title="Clear route">
+    🗑️
+  </button>
+</div>
+
+<script>
+  // Enhanced Map Setup
+  const map = L.map('map', { 
+    zoomControl: false,
+    attributionControl: false,
+    minZoom: 2,
+    maxZoom: 19
+  }).setView([20.5937, 78.9629], 5);
+  
+  // Add controls with better positioning
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.attribution({ 
+    position: 'bottomright', 
+    prefix: '<a href="https://leafletjs.com/">Leaflet</a>'
+  }).addTo(map);
+  
+  // High quality tile layer
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    detectRetina: true
+  }).addTo(map);
+
+  // UI Elements
+  const elements = {
+    from: document.getElementById('from'),
+    to: document.getElementById('to'),
+    fromSug: document.getElementById('fromSug'),
+    toSug: document.getElementById('toSug'),
+    go: document.getElementById('go'),
+    clear: document.getElementById('clear'),
+    swap: document.getElementById('swap'),
+    useCur: document.getElementById('useCur'),
+    header: document.getElementById('header'),
+    navPanel: document.getElementById('navPanel'),
+    directionsPanel: document.getElementById('directionsPanel'),
+    routeSummary: document.getElementById('routeSummary'),
+    directionsList: document.getElementById('directionsList'),
+    nextInstruction: document.getElementById('nextInstruction'),
+    navDistance: document.getElementById('navDistance'),
+    navTime: document.getElementById('navTime'),
+    currentSpeed: document.getElementById('currentSpeed'),
+    eta: document.getElementById('eta'),
+    remaining: document.getElementById('remaining'),
+    accuracy: document.getElementById('accuracy'),
+    closeNavPanel: document.getElementById('closeNavPanel'),
+    closeDirections: document.getElementById('closeDirections'),
+    progressBar: document.getElementById('progressBar'),
+    speedIndicator: document.getElementById('speedIndicator'),
+    speedValue: document.getElementById('speedValue'),
+    startNav: document.getElementById('startNav'),
+    pauseNav: document.getElementById('pauseNav'),
+    stopNav: document.getElementById('stopNav'),
+    mute: document.getElementById('mute'),
+    recenter: document.getElementById('recenter'),
+    recenterNotification: document.getElementById('recenterNotification'),
+    compass: document.getElementById('compass'),
+    statusToast: document.getElementById('statusToast'),
+    offRouteIndicator: document.getElementById('offRouteIndicator'),
+    offRouteDistance: document.getElementById('offRouteDistance')
+  };
+
+  // Enhanced State Management
+  const state = {
+    routingControl: null,
+    currentRoute: null,
+    userMarker: null,
+    userPosition: null,
+    userHeading: 0,
+    watchId: null,
+    navActive: false,
+    navPaused: false,
+    voiceMuted: false,
+    followUser: true,
+    compassMode: false,
+    nextInstructionIdx: 0,
+    lastAnnouncementDistance: Infinity,
+    announcedInstructions: new Set(),
+    routeStartTime: null,
+    totalDistance: 0,
+    distanceTraveled: 0,
+    currentSpeed: 0,
+    gpsAccuracy: 0,
+    previousPositions: [],
+    smoothingFactor: 0.3,
+    headerVisible: true,
+    lastInteraction: Date.now(),
+    isOffRoute: false,
+    offRouteDistance: 0,
+    offRouteStartTime: null,
+    recalculatingRoute: false,
+    lastRecalculation: 0,
+    routeDeviation: 0,
+    lastValidPosition: null,
+    consecutiveOffRouteChecks: 0,
+    instructionHistory: [],
+    nearbyInstructions: [],
+    lastSpokenInstruction: '',
+    lastSpokenTime: 0,
+    routingAttempts: 0,
+    maxRoutingAttempts: 3
+  };
+
+  // Enhanced Utility Functions
+  function parseLatLon(text) {
+    const parts = text.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && parts.every(n => !Number.isNaN(n))) {
+      return L.latLng(parts[0], parts[1]);
+    }
+    return null;
+  }
+
+  function distance(a, b) {
+    return map.distance(a, b);
+  }
+
+  function calculateBearing(start, end) {
+    const startLat = start.lat * Math.PI / 180;
+    const startLng = start.lng * Math.PI / 180;
+    const endLat = end.lat * Math.PI / 180;
+    const endLng = end.lng * Math.PI / 180;
+    
+    const dLng = endLng - startLng;
+    const y = Math.sin(dLng) * Math.cos(endLat);
+    const x = Math.cos(startLat) * Math.sin(endLat) - Math.sin(startLat) * Math.cos(endLat) * Math.cos(dLng);
+    
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function smoothSpeed(newSpeed) {
+    return state.currentSpeed + (newSpeed - state.currentSpeed) * state.smoothingFactor;
+  }
+
+  function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  }
+
+  function formatDistance(meters) {
+    if (meters >= 1000) return `${(meters/1000).toFixed(1)} km`;
+    return `${Math.round(meters)} m`;
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  function showStatusToast(message, duration = 3000) {
+    elements.statusToast.textContent = message;
+    elements.statusToast.classList.add('show');
+    setTimeout(() => {
+      elements.statusToast.classList.remove('show');
+    }, duration);
+  }
+
+  // Enhanced route deviation detection
+  function isUserOffRoute(userPosition, route) {
+    if (!route || !route.coordinates || !userPosition) return false;
+    
+    const coordinates = route.coordinates;
+    let minDistance = Infinity;
+    let closestPointIndex = -1;
+    
+    // Find the closest point on the route
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const segmentDistance = distanceToLineSegment(
+        userPosition, 
+        coordinates[i], 
+        coordinates[i + 1]
+      );
+      
+      if (segmentDistance < minDistance) {
+        minDistance = segmentDistance;
+        closestPointIndex = i;
+      }
+    }
+    
+    // Consider off-route if more than 50m away from route
+    const threshold = 50;
+    state.routeDeviation = minDistance;
+    
+    return minDistance > threshold;
+  }
+
+  function distanceToLineSegment(point, lineStart, lineEnd) {
+    const A = point.lat - lineStart.lat;
+    const B = point.lng - lineStart.lng;
+    const C = lineEnd.lat - lineStart.lat;
+    const D = lineEnd.lng - lineStart.lng;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) return distance(point, lineStart);
+    
+    let t = Math.max(0, Math.min(1, dot / lenSq));
+    
+    const projection = L.latLng(
+      lineStart.lat + t * C,
+      lineStart.lng + t * D
+    );
+    
+    return distance(point, projection);
+  }
+
+  // Enhanced route recalculation
+  async function recalculateRoute() {
+    if (state.recalculatingRoute || !state.userPosition || !state.currentRoute) {
+      return;
+    }
+    
+    const now = Date.now();
+    if (now - state.lastRecalculation < 10000) { // Prevent frequent recalculations
+      return;
+    }
+    
+    state.recalculatingRoute = true;
+    state.lastRecalculation = now;
+    state.routingAttempts++;
+    
+    if (state.routingAttempts > state.maxRoutingAttempts) {
+      showStatusToast('❌ Unable to recalculate route. Please check your connection.', 5000);
+      state.recalculatingRoute = false;
+      return;
+    }
+    
+    showStatusToast('🔄 Recalculating route...', 2000);
+    
+    try {
+      const destination = state.currentRoute.waypoints[state.currentRoute.waypoints.length - 1].latLng;
+      
+      // Remove old route
+      if (state.routingControl) {
+        map.removeControl(state.routingControl);
+      }
+      
+      // Create new route from current position
+      await createRouteFromPosition(state.userPosition, destination);
+      
+      state.isOffRoute = false;
+      state.offRouteStartTime = null;
+      state.consecutiveOffRouteChecks = 0;
+      state.routingAttempts = 0;
+      
+      elements.offRouteIndicator.style.display = 'none';
+      elements.offRouteDistance.style.display = 'none';
+      
+      // Update marker appearance
+      if (state.userMarker) {
+        const markerElement = state.userMarker.getElement();
+        if (markerElement) {
+          markerElement.classList.remove('off-route');
+        }
+      }
+      
+      speak('Route recalculated. Continue straight.', true);
+      showStatusToast('✅ Route updated!', 2000);
+      
+    } catch (error) {
+      console.error('Route recalculation failed:', error);
+      showStatusToast('❌ Failed to recalculate route', 3000);
+    }
+    
+    state.recalculatingRoute = false;
+  }
+
+  async function createRouteFromPosition(fromLatLng, toLatLng) {
+    return new Promise((resolve, reject) => {
+      state.routingControl = L.Routing.control({
+        waypoints: [fromLatLng, toLatLng],
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1',
+          profile: 'driving'
+        }),
+        routeWhileDragging: false,
+        addWaypoints: false,
+        showAlternatives: false,
+        show: false,
+        lineOptions: {
+          styles: [{
+            color: '#6366f1',
+            opacity: 0.8,
+            weight: 6,
+            dashArray: '0, 10',
+            lineCap: 'round'
+          }]
+        },
+        createMarker: function(i, waypoint, nWaypoints) {
+          const isStart = i === 0;
+          if (isStart && state.userMarker) {
+            return state.userMarker; // Use existing user marker for start
+          }
+          const icon = L.divIcon({
+            className: isStart ? 'start-marker' : 'end-marker',
+            html: isStart ? '🚩' : '🎯',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+          return L.marker(waypoint.latLng, { icon, draggable: false });
+        }
+      }).addTo(map);
+
+      state.routingControl.on('routesfound', (e) => {
+        state.currentRoute = e.routes[0];
+        state.nextInstructionIdx = 0;
+        state.totalDistance = state.currentRoute.summary.totalDistance;
+        state.lastAnnouncementDistance = Infinity;
+        state.announcedInstructions.clear();
+        
+        displayRouteInfo(state.currentRoute);
+        updateNavigationInfo();
+        resolve();
+      });
+
+      state.routingControl.on('routingerror', (error) => {
+        console.error('Routing error:', error);
+        reject(error);
+      });
+    });
+  }
+
+  // Enhanced Geocoding with better error handling
+  async function photonSearch(query, options = {}) {
+    const url = new URL('https://photon.komoot.io/api/');
+    url.searchParams.set('q', query);
+    url.searchParams.set('limit', options.limit || '8');
+    if (options.lat && options.lon) {
+      url.searchParams.set('lat', options.lat);
+      url.searchParams.set('lon', options.lon);
+    }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  function renderSuggestions(container, features, onSelect) {
+    container.innerHTML = '';
+    if (!features || !features.length) {
+      container.style.display = 'none';
+      return;
+    }
+    
+    features.forEach(feature => {
+      const props = feature.properties;
+      const name = props.name || props.street || 'Unnamed Location';
+      const parts = [props.city, props.state, props.country].filter(Boolean);
+      const address = parts.join(', ');
+      
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.innerHTML = `
+        <div class="suggestion-name">${name}</div>
+        <div class="suggestion-address">${address}</div>
+      `;
+      
+      item.addEventListener('click', () => onSelect(feature));
+      container.appendChild(item);
+    });
+    
+    container.style.display = 'block';
+  }
+
+  function setupAutocomplete(input, suggestionsContainer) {
+    const debouncedSearch = debounce(async (query) => {
+      if (query.length < 2) {
+        suggestionsContainer.style.display = 'none';
+        return;
+      }
+      
+      try {
+        const searchOptions = {};
+        if (state.userPosition) {
+          searchOptions.lat = state.userPosition.lat;
+          searchOptions.lon = state.userPosition.lng;
+        }
+        
+        const data = await photonSearch(query, searchOptions);
+        renderSuggestions(suggestionsContainer, data.features, (feature) => {
+          const [lon, lat] = feature.geometry.coordinates;
+          input.dataset.lat = lat;
+          input.dataset.lon = lon;
+          
+          const props = feature.properties;
+          const label = [props.name, props.city, props.country]
+            .filter(Boolean).join(', ');
+          input.value = label;
+          suggestionsContainer.style.display = 'none';
+        });
+      } catch (error) {
+        console.error('Search error:', error);
+        suggestionsContainer.style.display = 'none';
+      }
+    }, 300);
+
+    input.addEventListener('input', (e) => {
+      input.removeAttribute('data-lat');
+      input.removeAttribute('data-lon');
+      const query = e.target.value.trim();
+      debouncedSearch(query);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const firstSuggestion = suggestionsContainer.querySelector('.suggestion-item');
+        if (firstSuggestion) {
+          firstSuggestion.click();
+        } else if (input.value.trim()) {
+          elements.go.click();
+        }
+      }
+      if (e.key === 'Escape') {
+        suggestionsContainer.style.display = 'none';
+      }
+    });
+
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!suggestionsContainer.contains(e.target) && e.target !== input) {
+        suggestionsContainer.style.display = 'none';
+      }
+    });
+  }
+
+  // Setup autocomplete for both inputs
+  setupAutocomplete(elements.from, elements.fromSug);
+  setupAutocomplete(elements.to, elements.toSug);
+
+  async function geocodeInput(input) {
+    // Check if coordinates are already cached
+    if (input.dataset.lat && input.dataset.lon) {
+      return L.latLng(parseFloat(input.dataset.lat), parseFloat(input.dataset.lon));
+    }
+    
+    // Try to parse as coordinates
+    const parsed = parseLatLon(input.value.trim());
+    if (parsed) return parsed;
+    
+    // Geocode the address
+    const result = await photonSearch(input.value.trim(), { limit: 1 });
+    if (!result.features || !result.features[0]) {
+      throw new Error(`Location not found: ${input.value.trim()}`);
+    }
+    
+    const [lon, lat] = result.features[0].geometry.coordinates;
+    input.dataset.lat = lat;
+    input.dataset.lon = lon;
+    return L.latLng(lat, lon);
+  }
+
+  async function reverseGeocode(latlng) {
+    try {
+      const url = new URL('https://nominatim.openstreetmap.org/reverse');
+      url.searchParams.set('format', 'jsonv2');
+      url.searchParams.set('lat', latlng.lat);
+      url.searchParams.set('lon', latlng.lng);
+      url.searchParams.set('zoom', '16');
+      
+      const response = await fetch(url, {
+        headers: { 'Accept-Language': 'en' }
+      });
+      
+      if (!response.ok) return null;
+      return response.json();
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      return null;
+    }
+  }
+
+  // Enhanced Routing
+  function createRoute(fromLatLng, toLatLng) {
+    if (state.routingControl) {
+      map.removeControl(state.routingControl);
+      state.routingControl = null;
+    }
+    
+    // Show loading state
+    elements.go.disabled = true;
+    elements.go.innerHTML = '🔄 Finding route...';
+    
+    state.routingControl = L.Routing.control({
+      waypoints: [fromLatLng, toLatLng],
+      router: L.Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1',
+        profile: 'driving'
+      }),
+      routeWhileDragging: false,
+      addWaypoints: false,
+      showAlternatives: false,
+      show: false,
+      lineOptions: {
+        styles: [{
+          color: '#6366f1',
+          opacity: 0.8,
+          weight: 6,
+          dashArray: '0, 10',
+          lineCap: 'round'
+        }]
+      },
+      createMarker: function(i, waypoint, nWaypoints) {
+        const isStart = i === 0;
+        const icon = L.divIcon({
+          className: isStart ? 'start-marker' : 'end-marker',
+          html: isStart ? '🚩' : '🎯',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        return L.marker(waypoint.latLng, { icon, draggable: false });
+      }
+    }).addTo(map);
+
+    state.routingControl.on('routesfound', (e) => {
+      state.currentRoute = e.routes[0];
+      state.nextInstructionIdx = 0;
+      state.totalDistance = state.currentRoute.summary.totalDistance;
+      state.distanceTraveled = 0;
+      state.announcedInstructions.clear();
+      state.routingAttempts = 0;
+      
+      // Fit map to route with padding
+      const bounds = L.latLngBounds(state.currentRoute.coordinates);
+      map.fitBounds(bounds, { 
+        padding: [60, 60],
+        maxZoom: 16
+      });
+      
+      displayRouteInfo(state.currentRoute);
+      elements.directionsPanel.style.display = 'flex';
+      elements.startNav.style.display = 'inline-flex';
+      
+      // Reset button
+      elements.go.disabled = false;
+      elements.go.innerHTML = '🗺️ Get Directions';
+      
+      showStatusToast('✅ Route found!', 2000);
+      
+      // Auto-hide header on mobile after route is found
+      if (window.innerWidth <= 768) {
+        setTimeout(() => {
+          elements.header.classList.add('hidden');
+          state.headerVisible = false;
+        }, 3000);
+      }
+    });
+
+    state.routingControl.on('routingerror', (error) => {
+      console.error('Routing error:', error);
+      showStatusToast('❌ Could not find route. Please try different locations.', 5000);
+      elements.go.disabled = false;
+      elements.go.innerHTML = '🗺️ Get Directions';
+    });
+  }
+
+  function displayRouteInfo(route) {
+    const distance = (route.summary.totalDistance / 1000).toFixed(1);
+    const duration = Math.round(route.summary.totalTime / 60);
+    
+    elements.routeSummary.innerHTML = `
+      <div class="nav-badges">
+        <div class="badge">${distance} km</div>
+        <div class="badge success">${duration} min</div>
+      </div>
+    `;
+    
+    // Clear and populate directions list
+    elements.directionsList.innerHTML = '';
+    
+    if (route.instructions) {
+      route.instructions.forEach((instruction, index) => {
+        const li = document.createElement('li');
+        li.className = 'direction-step';
+        li.id = `step-${index}`;
+        
+        // Add distance information
+        const distanceSpan = document.createElement('div');
+        distanceSpan.className = 'direction-distance';
+        distanceSpan.textContent = formatDistance(instruction.distance || 0);
+        
+        li.textContent = instruction.text;
+        li.appendChild(distanceSpan);
+        elements.directionsList.appendChild(li);
+      });
+    }
+    
+    updateNavigationInfo();
+  }
+
+  // Enhanced Voice Navigation with better logic
+  function speak(text, priority = false) {
+    if (state.voiceMuted || !('speechSynthesis' in window)) return;
+    
+    const now = Date.now();
+    
+    // Prevent speaking the same instruction multiple times within 30 seconds
+    if (text === state.lastSpokenInstruction && now - state.lastSpokenTime < 30000) {
+      return;
+    }
+    
+    if (priority || now - state.lastSpokenTime > 5000) {
+      if (priority) {
+        window.speechSynthesis.cancel();
+      }
+      
+      state.lastSpokenInstruction = text;
+      state.lastSpokenTime = now;
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.8;
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  // Enhanced Location Tracking
+  function createUserMarker(position, heading = 0) {
+    const icon = L.divIcon({
+      className: 'user-marker',
+      html: '<div class="direction-arrow"></div>',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+    
+    const marker = L.marker(position, { icon }).addTo(map);
+    updateMarkerHeading(marker, heading);
+    return marker;
+  }
+
+  function updateMarkerHeading(marker, heading) {
+    const element = marker.getElement();
+    if (element && !isNaN(heading)) {
+      const arrow = element.querySelector('.direction-arrow');
+      if (arrow) {
+        arrow.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+      }
+    }
+  }
+
+  function calculateSpeedFromPositions() {
+    if (state.previousPositions.length < 2) return 0;
+    
+    const now = Date.now();
+    const recentPositions = state.previousPositions.filter(p => now - p.timestamp < 6000);
+    
+    if (recentPositions.length < 2) return 0;
+    
+    const oldest = recentPositions[0];
+    const newest = recentPositions[recentPositions.length - 1];
+    const timeSpan = (newest.timestamp - oldest.timestamp) / 1000;
+    const distance = map.distance(oldest.position, newest.position);
+    
+    return timeSpan > 0 ? (distance / timeSpan) * 3.6 : 0; // km/h
+  }
+
+  // Enhanced Navigation Update with better instruction management
+  function handleNavigationUpdate(userPosition) {
+    if (!state.navActive || state.navPaused || !state.currentRoute) return;
+    
+    const instructions = state.currentRoute.instructions || [];
+    if (state.nextInstructionIdx >= instructions.length) return;
+    
+    // Check if user is off route
+    const offRoute = isUserOffRoute(userPosition, state.currentRoute);
+    
+    if (offRoute) {
+      state.consecutiveOffRouteChecks++;
+      if (state.consecutiveOffRouteChecks >= 3 && !state.isOffRoute) {
+        // User is consistently off route
+        state.isOffRoute = true;
+        state.offRouteStartTime = Date.now();
+        state.offRouteDistance = state.routeDeviation;
+        
+        elements.offRouteIndicator.style.display = 'block';
+        elements.offRouteDistance.style.display = 'inline-block';
+        elements.offRouteDistance.textContent = `Off: ${Math.round(state.routeDeviation)}m`;
+        
+        // Update marker appearance
+        if (state.userMarker) {
+          const markerElement = state.userMarker.getElement();
+          if (markerElement) {
+            markerElement.classList.add('off-route');
+          }
+        }
+        
+        speak('You are off the route. Recalculating...', true);
+        
+        // Show recenter notification
+        elements.recenterNotification.style.display = 'flex';
+      }
+      
+      // Auto-recalculate after being off route for 10 seconds
+      if (state.isOffRoute && Date.now() - state.offRouteStartTime > 10000) {
+        recalculateRoute();
+      }
+    } else {
+      // User is back on route
+      state.consecutiveOffRouteChecks = 0;
+      if (state.isOffRoute) {
+        state.isOffRoute = false;
+        state.offRouteStartTime = null;
+        elements.offRouteIndicator.style.display = 'none';
+        elements.offRouteDistance.style.display = 'none';
+        elements.recenterNotification.style.display = 'none';
+        
+        // Update marker appearance
+        if (state.userMarker) {
+          const markerElement = state.userMarker.getElement();
+          if (markerElement) {
+            markerElement.classList.remove('off-route');
+          }
+        }
+      }
+    }
+    
+    // Handle turn-by-turn instructions
+    const currentInstruction = instructions[state.nextInstructionIdx];
+    const turnPoint = state.currentRoute.coordinates[currentInstruction.index];
+    const distanceToTurn = distance(userPosition, turnPoint);
+    
+    // Create unique instruction ID to prevent repetition
+    const instructionId = `${state.nextInstructionIdx}-${Math.floor(distanceToTurn / 10)}`;
+    
+    // Progressive voice announcements with better logic
+    const announcements = [
+      { distance: 1000, text: `In 1 kilometer, ${currentInstruction.text}` },
+      { distance: 500, text: `In 500 meters, ${currentInstruction.text}` },
+      { distance: 200, text: `In 200 meters, ${currentInstruction.text}` },
+      { distance: 100, text: `In 100 meters, ${currentInstruction.text}` },
+      { distance: 50, text: currentInstruction.text }
+    ];
+    
+    for (const announcement of announcements) {
+      const announcementId = `${instructionId}-${announcement.distance}`;
+      if (distanceToTurn <= announcement.distance && 
+          !state.announcedInstructions.has(announcementId) &&
+          state.lastAnnouncementDistance > announcement.distance) {
+        
+        speak(announcement.text);
+        state.announcedInstructions.add(announcementId);
+        state.lastAnnouncementDistance = announcement.distance;
+        break;
+      }
+    }
+    
+    // Move to next instruction when close enough
+    if (distanceToTurn < 30) {
+      // Mark previous step as completed
+      const prevStep = document.getElementById(`step-${Math.max(0, state.nextInstructionIdx - 1)}`);
+      if (prevStep) prevStep.classList.add('completed');
+      
+      // Mark current step as active
+      const currentStep = document.getElementById(`step-${state.nextInstructionIdx}`);
+      if (currentStep) {
+        currentStep.classList.add('current');
+        currentStep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      // Move to next instruction
+      state.nextInstructionIdx++;
+      state.lastAnnouncementDistance = Infinity;
+      
+      // Check if route is completed
+      if (state.nextInstructionIdx >= instructions.length) {
+        speak('You have arrived at your destination! Navigation complete.', true);
+        showStatusToast('🎉 Destination reached!', 5000);
+        setTimeout(() => stopNavigation(), 3000);
+      }
+    }
+    
+    updateNavigationInfo();
+  }
+
+  function updateNavigationInfo() {
+    if (!state.currentRoute) return;
+    
+    const remainingDistance = Math.max(0, state.totalDistance - state.distanceTraveled);
+    const avgSpeed = state.currentSpeed > 5 ? state.currentSpeed : 30; // fallback to 30 km/h
+    const remainingTimeSeconds = (remainingDistance / 1000) / avgSpeed * 3600;
+    
+    elements.navDistance.textContent = formatDistance(remainingDistance);
+    elements.navTime.textContent = formatTime(remainingTimeSeconds);
+    elements.currentSpeed.textContent = Math.round(state.currentSpeed);
+    elements.remaining.textContent = formatDistance(remainingDistance);
+    elements.speedValue.textContent = Math.round(state.currentSpeed);
+    elements.accuracy.textContent = state.gpsAccuracy > 0 ? `${Math.round(state.gpsAccuracy)}m` : '--';
+    
+    // Update progress bar
+    const progress = Math.min((state.distanceTraveled / state.totalDistance) * 100, 100);
+    elements.progressBar.style.width = `${progress}%`;
+    
+    // Update ETA
+    if (state.routeStartTime && remainingTimeSeconds > 0) {
+      const eta = new Date(Date.now() + remainingTimeSeconds * 1000);
+      elements.eta.textContent = eta.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } else {
+      elements.eta.textContent = '--:--';
+    }
+    
+    // Update next instruction
+    const instructions = state.currentRoute.instructions || [];
+    if (state.nextInstructionIdx < instructions.length) {
+      const nextInstr = instructions[state.nextInstructionIdx];
+      elements.nextInstruction.textContent = nextInstr.text;
+    } else {
+      elements.nextInstruction.textContent = 'Continue to destination';
+    }
+    
+    // Update off-route distance if applicable
+    if (state.isOffRoute) {
+      elements.offRouteDistance.textContent = `Off: ${Math.round(state.routeDeviation)}m`;
+    }
+  }
+
+  function startLocationTracking() {
+    if (state.watchId) {
+      navigator.geolocation.clearWatch(state.watchId);
+    }
+    
+    if (!navigator.geolocation) {
+      showStatusToast('❌ GPS location is not supported on this device', 5000);
+      return;
+    }
+    
+    const options = {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 15000
+    };
+    
+    state.watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const newPosition = L.latLng(position.coords.latitude, position.coords.longitude);
+        const timestamp = Date.now();
+        
+        // Store GPS accuracy
+        state.gpsAccuracy = position.coords.accuracy || 0;
+        
+        // Store position history
+        state.previousPositions.push({ position: newPosition, timestamp });
+        if (state.previousPositions.length > 15) {
+          state.previousPositions.shift();
+        }
+        
+        // Calculate heading and speed
+        if (state.userPosition && distance(state.userPosition, newPosition) > 2) {
+          const newHeading = calculateBearing(state.userPosition, newPosition);
+          if (!isNaN(newHeading)) {
+            state.userHeading = newHeading;
+          }
+          state.lastValidPosition = state.userPosition;
+        }
+        
+        state.userPosition = newPosition;
+        
+        // Calculate and smooth speed
+        const newSpeed = position.coords.speed 
+          ? position.coords.speed * 3.6 // Convert m/s to km/h
+          : calculateSpeedFromPositions();
+        state.currentSpeed = smoothSpeed(Math.max(0, newSpeed));
+        
+        // Update distance traveled during navigation
+        if (state.navActive && state.lastValidPosition) {
+          const distanceDelta = distance(state.lastValidPosition, newPosition);
+          if (distanceDelta < 200) { // Ignore GPS jumps
+            state.distanceTraveled += distanceDelta;
+          }
+        }
+        
+        // Update or create user marker
+        if (!state.userMarker) {
+          state.userMarker = createUserMarker(newPosition, state.userHeading);
+        } else {
+          state.userMarker.setLatLng(newPosition);
+          updateMarkerHeading(state.userMarker, state.userHeading);
+        }
+        
+        // Add moving class if speed > threshold
+        const markerElement = state.userMarker.getElement();
+        if (markerElement) {
+          markerElement.classList.toggle('moving', state.currentSpeed > 2);
+        }
+        
+        // Follow user if enabled
+        if (state.followUser) {
+          const zoom = Math.max(map.getZoom(), 15);
+          
+          // Smooth map rotation for compass mode
+          if (state.compassMode && !isNaN(state.userHeading)) {
+            map.setBearing(-state.userHeading);
+          }
+          
+          map.setView(newPosition, zoom, { 
+            animate: true, 
+            duration: 0.5,
+            easeLinearity: 0.25
+          });
+        }
+        
+        // Handle navigation updates
+        if (state.navActive && !state.navPaused) {
+          handleNavigationUpdate(newPosition);
+        }
+        
+        // Update UI elements
+        updateNavigationInfo();
+      },
+      (error) => {
+        console.error('Location error:', error);
+        let message = 'Location error: ';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            message = '❌ Location access denied. Please enable location services.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            message = '❌ Location unavailable. Please check your GPS.';
+            break;
+          case error.TIMEOUT:
+            message = '⏱️ Location request timeout. Retrying...';
+            break;
+          default:
+            message += error.message;
+        }
+        showStatusToast(message, 5000);
+      },
+      options
+    );
+  }
+
+  function stopLocationTracking() {
+    if (state.watchId) {
+      navigator.geolocation.clearWatch(state.watchId);
+      state.watchId = null;
+    }
+  }
+
+  // Navigation Control Functions
+  function startNavigation() {
+    if (!state.currentRoute) {
+      showStatusToast('⚠️ Please get directions first', 3000);
+      return;
+    }
+    
+    state.navActive = true;
+    state.navPaused = false;
+    state.followUser = true;
+    state.nextInstructionIdx = 0;
+    state.lastAnnouncementDistance = Infinity;
+    state.announcedInstructions.clear();
+    state.routeStartTime = Date.now();
+    state.distanceTraveled = 0;
+    state.isOffRoute = false;
+    state.consecutiveOffRouteChecks = 0;
+    
+    // Update UI
+    elements.navPanel.style.display = 'block';
+    elements.speedIndicator.style.display = 'flex';
+    elements.startNav.style.display = 'none';
+    elements.pauseNav.style.display = 'inline-flex';
+    elements.stopNav.style.display = 'inline-flex';
+    elements.recenter.classList.add('active');
+    
+    speak('Navigation started. Follow the route.', true);
+    startLocationTracking();
+    updateNavigationInfo();
+    showStatusToast('🧭 Navigation started', 2000);
+    
+    // Request wake lock
+    requestWakeLock();
+    
+    // Hide header on mobile
+    if (window.innerWidth <= 768) {
+      elements.header.classList.add('hidden');
+      state.headerVisible = false;
+    }
+  }
+
+  function pauseNavigation() {
+    if (!state.navActive) return;
+    
+    state.navPaused = !state.navPaused;
+    
+    if (state.navPaused) {
+      speak('Navigation paused');
+      stopLocationTracking();
+      releaseWakeLock();
+      elements.pauseNav.innerHTML = '▶️ Resume';
+      elements.pauseNav.title = 'Resume navigation';
+      showStatusToast('⏸️ Navigation paused', 2000);
+    } else {
+      speak('Navigation resumed');
+      startLocationTracking();
+      requestWakeLock();
+      elements.pauseNav.innerHTML = '⏸️ Pause';
+      elements.pauseNav.title = 'Pause navigation';
+      showStatusToast('▶️ Navigation resumed', 2000);
+    }
+  }
+
+  function stopNavigation() {
+    if (!state.navActive) return;
+    
+    state.navActive = false;
+    state.navPaused = false;
+    state.followUser = false;
+    state.nextInstructionIdx = 0;
+    state.routeStartTime = null;
+    state.distanceTraveled = 0;
+    state.isOffRoute = false;
+    state.announcedInstructions.clear();
+    
+    // Update UI
+    elements.navPanel.style.display = 'none';
+    elements.speedIndicator.style.display = 'none';
+    elements.startNav.style.display = 'inline-flex';
+    elements.pauseNav.style.display = 'none';
+    elements.stopNav.style.display = 'none';
+    elements.pauseNav.innerHTML = '⏸️ Pause';
+    elements.progressBar.style.width = '0%';
+    elements.recenter.classList.remove('active');
+    elements.offRouteIndicator.style.display = 'none';
+    elements.offRouteDistance.style.display = 'none';
+    elements.recenterNotification.style.display = 'none';
+    
+    // Clear step highlighting
+    const steps = elements.directionsList.querySelectorAll('.direction-step');
+    steps.forEach(step => {
+      step.classList.remove('current', 'completed');
+    });
+    
+    // Reset user marker
+    if (state.userMarker) {
+      const markerElement = state.userMarker.getElement();
+      if (markerElement) {
+        markerElement.classList.remove('off-route');
+      }
+    }
+    
+    speak('Navigation stopped');
+    stopLocationTracking();
+    releaseWakeLock();
+    showStatusToast('⏹️ Navigation stopped', 2000);
+    
+    // Show header on mobile
+    if (window.innerWidth <= 768 && !state.headerVisible) {
+      elements.header.classList.remove('hidden');
+      state.headerVisible = true;
+    }
+  }
+
+  function clearRoute() {
+    if (state.routingControl) {
+      map.removeControl(state.routingControl);
+      state.routingControl = null;
+    }
+    
+    state.currentRoute = null;
+    state.nextInstructionIdx = 0;
+    state.announcedInstructions.clear();
+    
+    // Clear inputs
+    elements.from.value = '';
+    elements.to.value = '';
+    elements.from.removeAttribute('data-lat');
+    elements.from.removeAttribute('data-lon');
+    elements.to.removeAttribute('data-lat');
+    elements.to.removeAttribute('data-lon');
+    
+    // Hide panels
+    elements.directionsPanel.style.display = 'none';
+    elements.navPanel.style.display = 'none';
+    
+    if (state.navActive) {
+      stopNavigation();
+    }
+    
+    showStatusToast('🗑️ Route cleared', 2000);
+    
+    // Show header if hidden
+    if (!state.headerVisible) {
+      elements.header.classList.remove('hidden');
+      state.headerVisible = true;
+    }
+  }
+
+  // Event Listeners
+
+  // Route Planning
+  elements.go.addEventListener('click', async () => {
+    try {
+      const fromLatLng = await geocodeInput(elements.from);
+      const toLatLng = await geocodeInput(elements.to);
+      createRoute(fromLatLng, toLatLng);
+    } catch (error) {
+      console.error('Routing error:', error);
+      showStatusToast(`❌ ${error.message || 'Failed to create route'}`, 5000);
+    }
+  });
+
+  elements.clear.addEventListener('click', clearRoute);
+
+  elements.swap.addEventListener('click', () => {
+    // Swap input values
+    const tempValue = elements.from.value;
+    const tempLat = elements.from.dataset.lat;
+    const tempLon = elements.from.dataset.lon;
+    
+    elements.from.value = elements.to.value;
+    elements.to.value = tempValue;
+    
+    // Swap coordinates
+    if (elements.to.dataset.lat && elements.to.dataset.lon) {
+      elements.from.dataset.lat = elements.to.dataset.lat;
+      elements.from.dataset.lon = elements.to.dataset.lon;
+    } else {
+      elements.from.removeAttribute('data-lat');
+      elements.from.removeAttribute('data-lon');
+    }
+    
+    if (tempLat && tempLon) {
+      elements.to.dataset.lat = tempLat;
+      elements.to.dataset.lon = tempLon;
+    } else {
+      elements.to.removeAttribute('data-lat');
+      elements.to.removeAttribute('data-lon');
+    }
+    
+    showStatusToast('🔄 Locations swapped', 1500);
+  });
+
+  elements.useCur.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      showStatusToast('❌ Location services not supported', 3000);
+      return;
+    }
+    
+    elements.useCur.disabled = true;
+    elements.useCur.innerHTML = '🔡 Locating...';
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords = L.latLng(position.coords.latitude, position.coords.longitude);
+        map.setView(coords, 16);
+        
+        // Update or create user marker
+        if (!state.userMarker) {
+          state.userMarker = createUserMarker(coords);
+        } else {
+          state.userMarker.setLatLng(coords);
+        }
+        
+        state.userPosition = coords;
+        
+        try {
+          const geocodeResult = await reverseGeocode(coords);
+          const address = geocodeResult?.display_name || 
+                         `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+          
+          elements.from.value = address;
+          elements.from.dataset.lat = coords.lat;
+          elements.from.dataset.lon = coords.lng;
+          showStatusToast('📍 Current location set', 2000);
+        } catch (error) {
+          console.error('Reverse geocoding failed:', error);
+          elements.from.value = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+          elements.from.dataset.lat = coords.lat;
+          elements.from.dataset.lon = coords.lng;
+          showStatusToast('📍 Location coordinates set', 2000);
+        }
+        
+        elements.useCur.disabled = false;
+        elements.useCur.innerHTML = '📱';
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        showStatusToast('❌ Could not get your location. Please check location settings.', 5000);
+        elements.useCur.disabled = false;
+        elements.useCur.innerHTML = '📱';
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    );
+  });
+
+  // Navigation Controls
+  elements.startNav.addEventListener('click', startNavigation);
+  elements.pauseNav.addEventListener('click', pauseNavigation);
+  elements.stopNav.addEventListener('click', stopNavigation);
+
+  elements.mute.addEventListener('click', () => {
+    state.voiceMuted = !state.voiceMuted;
+    elements.mute.innerHTML = state.voiceMuted ? '🔇' : '🔊';
+    elements.mute.classList.toggle('active', !state.voiceMuted);
+    elements.mute.title = state.voiceMuted ? 'Voice muted' : 'Voice enabled';
+    
+    const message = state.voiceMuted ? 'Voice guidance muted' : 'Voice guidance enabled';
+    speak(message);
+    showStatusToast(state.voiceMuted ? '🔇 Voice muted' : '🔊 Voice enabled', 2000);
+  });
+
+  elements.recenter.addEventListener('click', () => {
+    state.followUser = !state.followUser;
+    elements.recenter.classList.toggle('active', state.followUser);
+    elements.recenter.title = state.followUser ? 'Following user' : 'Free view';
+    elements.recenterNotification.style.display = 'none';
+    
+    if (state.followUser && state.userPosition) {
+      map.setView(state.userPosition, Math.max(map.getZoom(), 16), {
+        animate: true,
+        duration: 1
+      });
+      showStatusToast('🎯 Following your location', 2000);
+    } else {
+      showStatusToast('🗺️ Free view mode', 2000);
+    }
+  });
+
+  elements.compass.addEventListener('click', () => {
+    state.compassMode = !state.compassMode;
+    elements.compass.classList.toggle('active', state.compassMode);
+    elements.compass.title = state.compassMode ? 'Heading up mode' : 'North up mode';
+    
+    if (!state.compassMode) {
+      map.setBearing(0); // Reset to north up
+      showStatusToast('🧭 North up mode', 2000);
+    } else {
+      showStatusToast('🧭 Heading up mode', 2000);
+    }
+  });
+
+  // Panel Controls
+  elements.closeNavPanel.addEventListener('click', () => {
+    elements.navPanel.style.display = 'none';
+  });
+
+  elements.closeDirections.addEventListener('click', () => {
+    elements.directionsPanel.style.display = 'none';
+  });
+
+  // Enhanced Keyboard Shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    
+    switch (e.key) {
+      case 'Enter':
+        if (elements.from.value && elements.to.value) {
+          elements.go.click();
+        }
+        break;
+      case 'Escape':
+        if (state.navActive) {
+          stopNavigation();
+        } else {
+          clearRoute();
+        }
+        break;
+      case ' ':
+        e.preventDefault();
+        if (state.navActive) {
+          pauseNavigation();
+        } else if (state.currentRoute) {
+          startNavigation();
+        }
+        break;
+      case 'f':
+      case 'F':
+        elements.recenter.click();
+        break;
+      case 'm':
+      case 'M':
+        elements.mute.click();
+        break;
+      case 'c':
+      case 'C':
+        elements.compass.click();
+        break;
+      case 'r':
+      case 'R':
+        if (state.isOffRoute) {
+          recalculateRoute();
+        }
+        break;
+    }
+  });
+
+  // Enhanced Map Interactions
+  map.on('click', async (e) => {
+    // Only set destination if "to" field is empty
+    if (!elements.to.value) {
+      const position = e.latlng;
+      
+      try {
+        const result = await reverseGeocode(position);
+        const address = result?.display_name || 
+                       `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`;
+        
+        elements.to.value = address;
+        elements.to.dataset.lat = position.lat;
+        elements.to.dataset.lon = position.lng;
+        showStatusToast('📍 Destination set', 2000);
+      } catch (error) {
+        console.error('Reverse geocoding failed:', error);
+        elements.to.value = `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}`;
+        elements.to.dataset.lat = position.lat;
+        elements.to.dataset.lon = position.lng;
+        showStatusToast('📍 Destination coordinates set', 2000);
+      }
+    }
+  });
+
+  // Stop following when user manually pans the map during navigation
+  map.on('dragstart', () => {
+    if (state.followUser && state.navActive) {
+      state.followUser = false;
+      elements.recenter.classList.remove('active');
+      elements.recenterNotification.style.display = 'flex';
+      showStatusToast('🗺️ Free view - tap center to follow', 3000);
+    }
+  });
+
+  // Touch and interaction handling
+  let lastTouchTime = 0;
+  map.on('click touchend', () => {
+    const now = Date.now();
+    if (now - lastTouchTime < 300) return; // Prevent double-tap issues
+    lastTouchTime = now;
+    
+    state.lastInteraction = now;
+    
+    // Show header if hidden and not in navigation
+    if (!state.headerVisible && !state.navActive && window.innerWidth <= 768) {
+      elements.header.classList.remove('hidden');
+      state.headerVisible = true;
+    }
+  });
+
+  // Auto-hide header during navigation on mobile
+  function handleAutoHideHeader() {
+    if (window.innerWidth > 768) return;
+    
+    const timeSinceInteraction = Date.now() - state.lastInteraction;
+    
+    if (state.navActive && state.headerVisible && timeSinceInteraction > 5000) {
+      elements.header.classList.add('hidden');
+      state.headerVisible = false;
+    }
+  }
+
+  // Update interaction time when user interacts with controls
+  document.addEventListener('touchstart', () => {
+    state.lastInteraction = Date.now();
+  });
+
+  // Responsive handling
+  function handleResize() {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (!isMobile && !state.headerVisible) {
+      elements.header.classList.remove('hidden');
+      state.headerVisible = true;
+    }
+    
+    // Adjust map view on orientation change
+    if (state.userPosition && state.followUser) {
+      setTimeout(() => {
+        map.setView(state.userPosition, map.getZoom());
+      }, 100);
+    }
+  }
+
+  window.addEventListener('resize', debounce(handleResize, 250));
+  window.addEventListener('orientationchange', () => {
+    setTimeout(handleResize, 500);
+  });
+
+  // Enhanced periodic updates
+  setInterval(() => {
+    if (state.navActive) {
+      updateNavigationInfo();
+      handleAutoHideHeader();
+      
+      // Check for stale GPS data
+      if (state.previousPositions.length > 0) {
+        const lastPosition = state.previousPositions[state.previousPositions.length - 1];
+        const timeSinceLastGPS = Date.now() - lastPosition.timestamp;
+        
+        if (timeSinceLastGPS > 10000) { // No GPS for 10 seconds
+          showStatusToast('⚠️ GPS signal weak', 2000);
+        }
+      }
+    }
+  }, 1000);
+
+  // Prevent zoom on input focus (iOS Safari)
+  const inputs = document.querySelectorAll('input');
+  inputs.forEach(input => {
+    input.addEventListener('focus', () => {
+      input.style.fontSize = '16px';
+    });
+    input.addEventListener('blur', () => {
+      input.style.fontSize = '';
+    });
+  });
+
+  // Service Worker Registration for PWA capabilities
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registered:', registration);
+        })
+        .catch(registrationError => {
+          console.log('ServiceWorker registration failed:', registrationError);
+        });
+    });
+  }
+
+  // Enhanced Wake lock to keep screen on during navigation
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Screen wake lock acquired');
+        
+        wakeLock.addEventListener('release', () => {
+          console.log('Screen wake lock released');
+        });
+      } catch (err) {
+        console.error('Failed to acquire wake lock:', err);
+      }
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock !== null) {
+      wakeLock.release();
+      wakeLock = null;
+    }
+  }
+
+  // Release wake lock when page is hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.navActive) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  });
+
+  // Battery status monitoring (if available)
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+      function updateBatteryInfo() {
+        if (battery.level < 0.15 && state.navActive) {
+          showStatusToast('🔋 Low battery - consider saving power', 3000);
+        }
+      }
+      
+      battery.addEventListener('levelchange', updateBatteryInfo);
+      battery.addEventListener('chargingchange', () => {
+        if (state.navActive) {
+          showStatusToast(battery.charging ? '🔌 Charging' : '🔋 Unplugged', 2000);
+        }
+      });
+      updateBatteryInfo();
+    });
+  }
+
+  // Enhanced Network status monitoring
+  function updateNetworkStatus() {
+    const isOnline = navigator.onLine;
+    if (!isOnline && state.navActive) {
+      showStatusToast('📶 Network lost - GPS will continue offline', 4000);
+      speak('Network connection lost. GPS navigation will continue offline.', true);
+    } else if (isOnline && state.navActive) {
+      showStatusToast('📶 Network restored', 2000);
+    }
+  }
+
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+
+  // Initialize app
+  function initializeApp() {
+    // Set initial view to user's approximate location based on timezone
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timeZone.includes('Asia/Calcutta') || timeZone.includes('Asia/Kolkata')) {
+      map.setView([20.5937, 78.9629], 5); // India
+    } else if (timeZone.includes('America')) {
+      map.setView([39.8283, -98.5795], 4); // USA
+    } else if (timeZone.includes('Europe')) {
+      map.setView([54.526, 15.2551], 4); // Europe
+    }
+
+    // Focus on the first input for better UX
+    if (window.innerWidth > 768) {
+      elements.from.focus();
+    }
+
+    // Check for URL parameters (for deep linking)
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromParam = urlParams.get('from');
+    const toParam = urlParams.get('to');
+    
+    if (fromParam) elements.from.value = decodeURIComponent(fromParam);
+    if (toParam) elements.to.value = decodeURIComponent(toParam);
+    
+    if (fromParam && toParam) {
+      setTimeout(() => elements.go.click(), 1000);
+    }
+
+    // Show welcome message
+    showStatusToast('🌟 Smart Navigation ready!', 3000);
+    console.log('Smart Navigation App initialized with enhanced features');
+  }
+
+  // Enhanced Error handling
+  window.addEventListener('error', (e) => {
+    console.error('App error:', e.error);
+    showStatusToast('⚠️ App error occurred - please refresh if issues persist', 5000);
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('Unhandled promise rejection:', e.reason);
+    e.preventDefault();
+    showStatusToast('⚠️ Network or processing error', 3000);
+  });
+
+  // Initialize the application
+  initializeApp();
+
+</script>
+</body>
+</html>
